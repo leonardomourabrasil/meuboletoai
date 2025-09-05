@@ -114,9 +114,12 @@ export const useBills = () => {
 
       if (error) {
         console.error('Erro ao adicionar boleto:', error);
+        const message = (error as any)?.message?.includes('discount')
+          ? 'Não foi possível adicionar o boleto: coluna "discount" não existe no banco. Aplique a migration de schema.'
+          : `Não foi possível adicionar o boleto${(error as any)?.message ? `: ${(error as any).message}` : ''}`;
         toast({
           title: "Erro",
-          description: "Não foi possível adicionar o boleto",
+          description: message,
           variant: "destructive"
         });
         return;
@@ -133,7 +136,7 @@ export const useBills = () => {
       console.error('Erro ao adicionar boleto:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível adicionar o boleto",
+        description: error instanceof Error ? `Não foi possível adicionar o boleto: ${error.message}` : "Não foi possível adicionar o boleto",
         variant: "destructive"
       });
     }

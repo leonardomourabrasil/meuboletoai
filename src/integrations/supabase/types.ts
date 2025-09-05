@@ -25,6 +25,7 @@ export type Database = {
           id: string
           paid: boolean
           payment_method: string | null
+          discount: number | null
           title: string
           updated_at: string
           user_id: string
@@ -39,6 +40,7 @@ export type Database = {
           id?: string
           paid?: boolean
           payment_method?: string | null
+          discount?: number | null
           title: string
           updated_at?: string
           user_id: string
@@ -53,6 +55,7 @@ export type Database = {
           id?: string
           paid?: boolean
           payment_method?: string | null
+          discount?: number | null
           title?: string
           updated_at?: string
           user_id?: string
