@@ -173,10 +173,13 @@ export const BillsList = ({
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex-shrink-0">
-        <CardTitle className="flex items-center gap-2">
-          <DollarSign className="h-5 w-5 text-primary" />
-          {title}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-primary" />
+            {title}
+          </CardTitle>
+          <Badge variant="secondary" className="text-xs sm:text-sm px-2 py-0.5">{bills.length}</Badge>
+        </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto">
         <div className="space-y-3 h-full">

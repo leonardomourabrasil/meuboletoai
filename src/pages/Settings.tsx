@@ -18,7 +18,9 @@ import {
   Key,
   ArrowLeft,
   Clock,
-  CheckCircle
+  CheckCircle,
+  BellRing,
+  Loader2
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AI_PROVIDERS, type AIProvider } from "@/lib/ai-providers";
@@ -45,6 +47,7 @@ const Settings = () => {
   const [newContactName, setNewContactName] = useState("");
   const [newContactPhone, setNewContactPhone] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [sendingReminders, setSendingReminders] = useState(false);
 
   // Atualizar apiKey quando settings mudarem
   useEffect(() => {
@@ -58,6 +61,55 @@ const Settings = () => {
       aiApiKey: apiKey 
     };
     saveSettings(updatedSettings);
+  };
+
+  // Disparar lembretes manualmente
+  const handleSendReminders = async () => {
+    if (!settings.notificationsEnabled) {
+      toast({
+        variant: "destructive",
+        title: "Notificações desativadas",
+        description: "Ative as notificações para disparar lembretes.",
+      });
+      return;
+    }
+
+    try {
+      setSendingReminders(true);
+      const resp = await fetch("/api/send-reminders", { method: "POST" });
+      const isJson = resp.headers.get("content-type")?.includes("application/json");
+      const data = isJson ? await resp.json() : null;
+
+      if (resp.ok) {
+        const users = data?.usersProcessed ?? 0;
+        const emails = data?.emailsSent ?? 0;
+        const whats = data?.whatsappsSent ?? 0;
+        toast({
+          title: "Lembretes enviados",
+          description: `Usuários: ${users} • E-mails: ${emails} • WhatsApp: ${whats}`,
+        });
+      } else if (resp.status === 404) {
+        toast({
+          variant: "destructive",
+          title: "Endpoint indisponível",
+          description: "No modo de desenvolvimento Vite, as rotas /api não estão ativas. Rode 'vercel dev' ou teste após o deploy.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Falha ao enviar lembretes",
+          description: data?.error || `Status ${resp.status}`,
+        });
+      }
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Erro de rede",
+        description: "Verifique sua conexão ou rode 'vercel dev' para usar as rotas /api localmente.",
+      });
+    } finally {
+      setSendingReminders(false);
+    }
   };
 
   // Email validation
@@ -474,6 +526,39 @@ const Settings = () => {
                     As notificações incluirão: nome do boleto, categoria, valor pago e data do pagamento
                   </p>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BellRing className="h-5 w-5 text-primary" />
+                Ações
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1 pr-4">
+                  <Label className="text-base font-medium">Enviar lembretes de hoje</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Dispara manualmente o endpoint e usa suas preferências atuais
+                  </p>
+                </div>
+                <Button onClick={handleSendReminders} disabled={sendingReminders || !settings.notificationsEnabled}>
+                  {sendingReminders ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <BellRing className="h-4 w-4 mr-2" />
+                  )}
+                  {sendingReminders ? "Enviando..." : "Enviar lembretes agora"}
+                </Button>
+              </div>
+              {!settings.notificationsEnabled && (
+                <p className="text-xs text-muted-foreground">
+                  Ative as notificações gerais para habilitar esta ação.
+                </p>
               )}
             </CardContent>
           </Card>

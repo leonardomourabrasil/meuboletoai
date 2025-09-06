@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface UserSettings {
   notificationsEnabled: boolean;
@@ -16,10 +17,10 @@ const DEFAULT_SETTINGS: UserSettings = {
   notificationsEnabled: true,
   emailRecipients: [],
   whatsappContacts: [],
-  aiApiKey: "AIzaSyCwZnmmxtKyD0k2fxh1vuo8IfdAKBKQPNQ", // Chave padrão do Gemini
+  aiApiKey: '', // Nunca comitar chaves; deixar vazio por padrão
   aiProvider: 'gemini', // Gemini como padrão
   reminderDaysBefore: [1],
-  paymentNotificationsEnabled: true
+  paymentNotificationsEnabled: true,
 };
 
 export const useUserSettings = () => {
@@ -28,18 +29,50 @@ export const useUserSettings = () => {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
 
+  // Widen type temporariamente para acessar tabelas recém-criadas sem tipos gerados
+  const sb: any = supabase;
+
   // Função para obter chave única por usuário
   const getStorageKey = useCallback(() => {
     return user ? `meuboleto-settings-${user.id}` : 'meuboleto-settings';
   }, [user]);
 
-  // Função para carregar configurações do localStorage com chave específica do usuário
+  // Função para carregar configurações (tenta Supabase quando logado)
   const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
       const storageKey = getStorageKey();
+
+      if (user) {
+        const { data, error } = await sb
+          .from('user_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!error && data) {
+          const normalized: UserSettings = {
+            notificationsEnabled: data.notifications_enabled ?? DEFAULT_SETTINGS.notificationsEnabled,
+            emailRecipients: Array.isArray(data.email_recipients)
+              ? data.email_recipients.map((email: string) => ({ id: email, email }))
+              : DEFAULT_SETTINGS.emailRecipients,
+            whatsappContacts: Array.isArray(data.whatsapp_recipients)
+              ? data.whatsapp_recipients.map((phone: string) => ({ id: phone, name: '', phone }))
+              : DEFAULT_SETTINGS.whatsappContacts,
+            aiApiKey: DEFAULT_SETTINGS.aiApiKey,
+            aiProvider: DEFAULT_SETTINGS.aiProvider,
+            reminderDaysBefore: Array.isArray(data.reminder_days) ? data.reminder_days : DEFAULT_SETTINGS.reminderDaysBefore,
+            paymentNotificationsEnabled: DEFAULT_SETTINGS.paymentNotificationsEnabled,
+          };
+          setSettings(normalized);
+          localStorage.setItem(storageKey, JSON.stringify(normalized));
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fallback: localStorage
       const savedSettings = localStorage.getItem(storageKey);
-      
       if (savedSettings) {
         try {
           const parsed = JSON.parse(savedSettings);
@@ -51,7 +84,7 @@ export const useUserSettings = () => {
             aiProvider: parsed?.aiProvider ?? DEFAULT_SETTINGS.aiProvider,
             reminderDaysBefore: Array.isArray(parsed?.reminderDaysBefore)
               ? parsed.reminderDaysBefore
-              : typeof parsed?.reminderDaysBefore === "number"
+              : typeof parsed?.reminderDaysBefore === 'number'
               ? [parsed.reminderDaysBefore]
               : DEFAULT_SETTINGS.reminderDaysBefore,
             paymentNotificationsEnabled: parsed?.paymentNotificationsEnabled ?? DEFAULT_SETTINGS.paymentNotificationsEnabled,
@@ -62,9 +95,7 @@ export const useUserSettings = () => {
           setSettings(DEFAULT_SETTINGS);
         }
       } else {
-        // Para usuários novos ou sem configurações salvas
         setSettings(DEFAULT_SETTINGS);
-        // Salvar configurações padrão imediatamente
         localStorage.setItem(storageKey, JSON.stringify(DEFAULT_SETTINGS));
       }
     } catch (error) {
@@ -73,27 +104,43 @@ export const useUserSettings = () => {
     } finally {
       setLoading(false);
     }
-  }, [getStorageKey]);
+  }, [getStorageKey, user]);
 
-  // Função para salvar configurações com chave específica do usuário
+  // Função para salvar configurações (também persiste no Supabase quando logado)
   const saveSettings = async (newSettings: UserSettings) => {
     try {
       const storageKey = getStorageKey();
       localStorage.setItem(storageKey, JSON.stringify(newSettings));
       setSettings(newSettings);
-      
+
+      if (user) {
+        const payload = {
+          user_id: user.id,
+          notifications_enabled: newSettings.notificationsEnabled,
+          email_recipients: newSettings.emailRecipients.map((r) => r.email),
+          whatsapp_recipients: newSettings.whatsappContacts.map((c) => c.phone),
+          reminder_days: newSettings.reminderDaysBefore,
+        };
+
+        const { error } = await sb
+          .from('user_settings')
+          .upsert(payload, { onConflict: 'user_id' });
+
+        if (error) {
+          console.error('Erro ao salvar user_settings no Supabase:', error);
+        }
+      }
+
       toast({
-        title: "Configurações salvas",
-        description: user 
-          ? "Suas configurações foram salvas para sua conta." 
-          : "Suas configurações foram salvas localmente.",
+        title: 'Configurações salvas',
+        description: user ? 'Suas configurações foram salvas para sua conta.' : 'Suas configurações foram salvas localmente.',
       });
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível salvar suas configurações",
-        variant: "destructive"
+        title: 'Erro',
+        description: 'Não foi possível salvar suas configurações',
+        variant: 'destructive',
       });
     }
   };
@@ -107,6 +154,6 @@ export const useUserSettings = () => {
     settings,
     loading,
     saveSettings,
-    loadSettings
+    loadSettings,
   };
 };
