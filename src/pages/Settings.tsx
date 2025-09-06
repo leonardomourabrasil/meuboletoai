@@ -48,11 +48,20 @@ const Settings = () => {
   const [newContactPhone, setNewContactPhone] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [lastRun, setLastRun] = useState<null | { date?: string; usersProcessed?: number; emailsSent?: number; whatsappsSent?: number; at: string }>(null);
 
   // Atualizar apiKey quando settings mudarem
   useEffect(() => {
     setApiKey(settings.aiApiKey || "");
   }, [settings]);
+
+  // Carregar status da última execução
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("reminders-last-run");
+      if (raw) setLastRun(JSON.parse(raw));
+    } catch {}
+  }, []);
 
   // Save settings to storage
   const handleSaveSettings = () => {
@@ -85,9 +94,12 @@ const Settings = () => {
         const emails = data?.emailsSent ?? 0;
         const whats = data?.whatsappsSent ?? 0;
         toast({
-          title: "Lembretes enviados",
+          title: data?.message || "Lembretes enviados",
           description: `Usuários: ${users} • E-mails: ${emails} • WhatsApp: ${whats}`,
         });
+        const info = { date: data?.date, usersProcessed: users, emailsSent: emails, whatsappsSent: whats, at: new Date().toISOString() };
+        setLastRun(info);
+        try { localStorage.setItem("reminders-last-run", JSON.stringify(info)); } catch {}
       } else if (resp.status === 404) {
         toast({
           variant: "destructive",
@@ -555,6 +567,17 @@ const Settings = () => {
                   {sendingReminders ? "Enviando..." : "Enviar lembretes agora"}
                 </Button>
               </div>
+              {lastRun && (
+                <div className="p-3 bg-muted/30 rounded-lg text-sm">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    <span><strong>Última execução:</strong> {new Date(lastRun.at).toLocaleString()}</span>
+                    {lastRun.date && <span><strong>Data alvo:</strong> {lastRun.date}</span>}
+                    <span><strong>Usuários:</strong> {lastRun.usersProcessed ?? 0}</span>
+                    <span><strong>E-mails:</strong> {lastRun.emailsSent ?? 0}</span>
+                    <span><strong>WhatsApp:</strong> {lastRun.whatsappsSent ?? 0}</span>
+                  </div>
+                </div>
+              )}
               {!settings.notificationsEnabled && (
                 <p className="text-xs text-muted-foreground">
                   Ative as notificações gerais para habilitar esta ação.
