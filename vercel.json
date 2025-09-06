@@ -1,7 +1,8 @@
 {
   "version": 2,
-  "rewrites": [
-    { "source": "/(?!api\/.*).*/", "destination": "/" }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/" }
   ],
   "crons": [
     { "path": "/api/send-reminders", "schedule": "0 12 * * *" }
