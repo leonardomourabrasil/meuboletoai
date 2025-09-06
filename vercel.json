@@ -3,6 +3,12 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "build": {
+    "env": {
+      "VITE_SUPABASE_URL": "https://gkrhsgqkojcxyvkgnowa.supabase.co",
+      "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrcmhzZ3Frb2pjeHl2a2dub3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1NDc4MDAsImV4cCI6MjA3MTEyMzgwMH0.b4uX-VR7HouJM8u5Zb_9fHHzX25lRPQX7w3D5nUaos8"
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/" }
