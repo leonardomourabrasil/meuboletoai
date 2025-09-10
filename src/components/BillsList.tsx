@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,7 @@ interface BillsListProps {
   onBillDelete: (billId: string) => void;
   title: string;
   showCheckbox?: boolean;
+  extraAction?: ReactNode; // novo botão/ação opcional no cabeçalho
 }
 
 export const BillsList = ({ 
@@ -45,7 +46,8 @@ export const BillsList = ({
   onBillStatusChange,
   onBillDelete,
   title, 
-  showCheckbox = true 
+  showCheckbox = true,
+  extraAction
 }: BillsListProps) => {
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -178,7 +180,10 @@ export const BillsList = ({
             <DollarSign className="h-5 w-5 text-primary" />
             {title}
           </CardTitle>
-          <Badge variant="secondary" className="text-xs sm:text-sm px-2 py-0.5">{bills.length}</Badge>
+          <div className="flex items-center gap-2">
+            {extraAction}
+            <Badge variant="secondary" className="text-xs sm:text-sm px-2 py-0.5">{bills.length}</Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto">

@@ -17,6 +17,7 @@ export interface Bill {
   created_at?: string;
   updated_at?: string;
   user_id?: string;
+  paid_at?: string; // NOVO: data real do pagamento
 }
 
 export interface BillForDisplay {
@@ -49,7 +50,8 @@ export const useBills = () => {
     barcode: bill.barcode,
     paymentMethod: bill.payment_method as any,
     discount: bill.discount || 0,
-    paidAt: bill.paid ? bill.updated_at?.split('T')[0] : undefined
+    // Fallback para dados antigos: se está pago mas sem paid_at, usar updated_at; senão due_date
+    paidAt: bill.paid_at ?? (bill.paid ? (bill.updated_at ?? bill.due_date) : undefined)
   });
 
   // Converter dados de exibição para formato do Supabase
@@ -142,14 +144,106 @@ export const useBills = () => {
     }
   };
 
+  // NOVO: Adicionar boleto retroativo (já pago, com paid_at definido)
+  const addRetroBill = async (retroBill: Omit<BillForDisplay, "id" | "status"> & { paidAt: string }) => {
+    if (!user) return;
+
+    try {
+      const baseBill: any = {
+        title: retroBill.beneficiary,
+        amount: retroBill.amount,
+        due_date: retroBill.dueDate,
+        paid: true,
+        category: retroBill.category,
+        barcode: retroBill.barcode,
+        payment_method: retroBill.paymentMethod,
+      };
+
+      // Monta payload inicial com paid_at e discount
+      let insertPayload: any = { ...baseBill, discount: retroBill.discount || 0, paid_at: retroBill.paidAt };
+
+      const attemptInsert = async (payload: any) => {
+        return await supabase
+          .from('bills')
+          .insert([{ ...payload, user_id: user.id }])
+          .select()
+          .single();
+      };
+
+      // 1ª tentativa
+      let { data, error } = await attemptInsert(insertPayload);
+
+      let removedPaidAt = false;
+      let removedDiscount = false;
+
+      if (error) {
+        console.error('Erro ao adicionar boleto retroativo (tentativa 1):', error);
+
+        // Fallback 1: remover paid_at se existir no payload
+        if ('paid_at' in insertPayload) {
+          delete insertPayload.paid_at;
+          removedPaidAt = true;
+          ({ data, error } = await attemptInsert(insertPayload));
+        }
+
+        // Fallback 2: ainda falhou? remover discount também
+        if (error && 'discount' in insertPayload) {
+          delete insertPayload.discount;
+          removedDiscount = true;
+          ({ data, error } = await attemptInsert(insertPayload));
+        }
+
+        if (error) {
+          const message = (error as any)?.message ? `: ${(error as any).message}` : '';
+          toast({
+            title: "Erro",
+            description: `Não foi possível adicionar o boleto retroativo${message}`,
+            variant: "destructive"
+          });
+          return;
+        }
+
+        // Avisos após fallbacks aplicados
+        if (removedPaidAt) {
+          toast({
+            title: "Aviso",
+            description: "A coluna 'paid_at' não foi encontrada no banco. O lançamento foi salvo, mas a data real de pagamento será inferida por 'updated_at'.",
+          });
+        }
+        if (removedDiscount) {
+          toast({
+            title: "Aviso",
+            description: "A coluna 'discount' não foi encontrada no banco. O lançamento foi salvo sem desconto.",
+          });
+        }
+      }
+
+      if (!data) return;
+
+      const displayBill = convertToDisplayFormat(data);
+      setBills(prev => [...prev, displayBill]);
+
+      toast({
+        title: "Sucesso",
+        description: "Boleto retroativo adicionado como pago"
+      });
+    } catch (error) {
+      console.error('Erro ao adicionar boleto retroativo:', error);
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? `Não foi possível adicionar o boleto retroativo: ${error.message}` : "Não foi possível adicionar o boleto retroativo",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Atualizar status do boleto
   const updateBillStatus = async (billId: string, newStatus: "pending" | "paid", paymentMethod?: string) => {
     if (!user) return;
 
     try {
       const updateData: any = {
-        paid: newStatus === "paid",
-        updated_at: new Date().toISOString()
+        paid: newStatus === "paid", // não forçar updated_at; trigger no BD cuidará
       };
 
       if (newStatus === "paid" && paymentMethod) {
@@ -266,6 +360,7 @@ export const useBills = () => {
     bills,
     loading,
     addBill,
+    addRetroBill, // NOVO
     updateBillStatus,
     deleteBill,
     loadBills

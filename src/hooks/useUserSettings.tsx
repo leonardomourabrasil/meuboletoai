@@ -11,6 +11,7 @@ export interface UserSettings {
   aiProvider: 'openai' | 'gemini' | 'claude';
   reminderDaysBefore: number[];
   paymentNotificationsEnabled: boolean;
+  upcomingWindowDays: number; // novo campo
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -21,6 +22,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   aiProvider: 'gemini', // Gemini como padrão
   reminderDaysBefore: [1],
   paymentNotificationsEnabled: true,
+  upcomingWindowDays: 7, // default
 };
 
 export const useUserSettings = () => {
@@ -63,6 +65,7 @@ export const useUserSettings = () => {
             aiProvider: DEFAULT_SETTINGS.aiProvider,
             reminderDaysBefore: Array.isArray(data.reminder_days) ? data.reminder_days : DEFAULT_SETTINGS.reminderDaysBefore,
             paymentNotificationsEnabled: DEFAULT_SETTINGS.paymentNotificationsEnabled,
+            upcomingWindowDays: typeof data.upcoming_window_days === 'number' ? data.upcoming_window_days : DEFAULT_SETTINGS.upcomingWindowDays,
           };
           setSettings(normalized);
           localStorage.setItem(storageKey, JSON.stringify(normalized));
@@ -88,6 +91,7 @@ export const useUserSettings = () => {
               ? [parsed.reminderDaysBefore]
               : DEFAULT_SETTINGS.reminderDaysBefore,
             paymentNotificationsEnabled: parsed?.paymentNotificationsEnabled ?? DEFAULT_SETTINGS.paymentNotificationsEnabled,
+            upcomingWindowDays: typeof parsed?.upcomingWindowDays === 'number' ? parsed.upcomingWindowDays : DEFAULT_SETTINGS.upcomingWindowDays,
           };
           setSettings(normalized);
         } catch (e) {
@@ -120,6 +124,7 @@ export const useUserSettings = () => {
           email_recipients: newSettings.emailRecipients.map((r) => r.email),
           whatsapp_recipients: newSettings.whatsappContacts.map((c) => c.phone),
           reminder_days: newSettings.reminderDaysBefore,
+          upcoming_window_days: newSettings.upcomingWindowDays,
         };
 
         const { error } = await sb

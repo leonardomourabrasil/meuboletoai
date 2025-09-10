@@ -15,15 +15,26 @@ CREATE TABLE IF NOT EXISTS public.reminders (
 -- Enable RLS on reminders
 ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Users can view their own reminders"
-ON public.reminders
-FOR SELECT
-USING (auth.uid() = user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'reminders' AND policyname = 'Users can view their own reminders'
+  ) THEN
+    CREATE POLICY "Users can view their own reminders"
+    ON public.reminders
+    FOR SELECT
+    USING (auth.uid() = user_id);
+  END IF;
 
-CREATE POLICY IF NOT EXISTS "Users can update their own reminders"
-ON public.reminders
-FOR UPDATE
-USING (auth.uid() = user_id);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'reminders' AND policyname = 'Users can update their own reminders'
+  ) THEN
+    CREATE POLICY "Users can update their own reminders"
+    ON public.reminders
+    FOR UPDATE
+    USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- Keep updated_at fresh
 DO $$

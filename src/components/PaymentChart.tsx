@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { TrendingUp, BarChart3, List } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -48,21 +48,37 @@ export const PaymentChart = ({ data, selectedCategory, selectedMonth, onMonthSel
     return null;
   };
 
-  const totalAmount = data.reduce((sum, item) => sum + (item.amount - (item.discount || 0)), 0);
-  const maxAmount = Math.max(...data.map(item => item.amount));
+  // Normaliza os dados recebidos para garantir 12 meses (Jan–Dez)
+  const monthsOrder = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const incomingMap = data.reduce<Record<string, number>>((acc, item) => {
+    const key = item.month.replace('.', '');
+    acc[key] = (acc[key] || 0) + item.amount;
+    return acc;
+  }, {});
+  const fullData = monthsOrder.map(m => ({ month: m, amount: incomingMap[m] || 0 }));
 
-  const handleBarClick = (data: any) => {
-    if (onMonthSelect && data && data.month) {
-      // Toggle selection: if clicking the same month, deselect it
-      const newSelectedMonth = selectedMonth === data.month ? null : data.month;
-      onMonthSelect(newSelectedMonth);
-    }
+  const totalAmount = fullData.reduce((sum, item) => sum + item.amount, 0);
+  const maxAmount = Math.max(...fullData.map(item => item.amount), 0);
+
+  const handleBarClick = (evt: any) => {
+    if (!onMonthSelect) return;
+    let label: string | null = null;
+    if (evt?.activeLabel) label = String(evt.activeLabel);
+    else if (evt?.payload?.month) label = String(evt.payload.month);
+    if (!label) return;
+    const normalized = label.replace('.', '');
+    const newSelectedMonth = selectedMonth === normalized ? null : normalized;
+    onMonthSelect(newSelectedMonth);
   };
 
   // Transform data to include color information for highlighting
-  const chartData = data.map(item => ({
+  const chartData = fullData.map(item => ({
     ...item,
-    fill: selectedMonth === item.month ? 'hsl(var(--primary))' : selectedMonth ? 'hsl(var(--muted-foreground) / 0.3)' : 'hsl(var(--primary))'
+    fill: selectedMonth === item.month
+      ? 'hsl(var(--primary))'
+      : selectedMonth
+        ? 'hsl(var(--muted-foreground) / 0.3)'
+        : 'hsl(var(--primary))'
   }));
 
   const ChartView = () => (
@@ -97,9 +113,12 @@ export const PaymentChart = ({ data, selectedCategory, selectedMonth, onMonthSel
             dataKey="amount" 
             radius={[4, 4, 0, 0]}
             onClick={handleBarClick}
-            fill="currentColor"
             className="cursor-pointer"
-          />
+          >
+            {chartData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.fill} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -108,7 +127,7 @@ export const PaymentChart = ({ data, selectedCategory, selectedMonth, onMonthSel
   const ListView = () => (
     <ScrollArea className="h-[300px]">
       <div className="space-y-3 pr-4">
-        {data.map((item, index) => (
+        {fullData.map((item, index) => (
           <div 
             key={index}
             className={`flex items-center justify-between p-4 border rounded-lg transition-colors cursor-pointer ${
@@ -131,11 +150,11 @@ export const PaymentChart = ({ data, selectedCategory, selectedMonth, onMonthSel
                     className={`h-2 rounded-full transition-all duration-300 ${
                       selectedMonth === item.month ? "bg-primary" : "bg-primary"
                     }`}
-                    style={{ width: `${(item.amount / maxAmount) * 100}%` }}
+                    style={{ width: `${maxAmount ? (item.amount / maxAmount) * 100 : 0}%` }}
                   />
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {(((item.amount - (item.discount || 0)) / totalAmount) * 100).toFixed(1)}%
+                  {totalAmount > 0 ? ((item.amount / totalAmount) * 100).toFixed(1) : "0.0"}%
                 </span>
               </div>
             </div>
@@ -144,13 +163,13 @@ export const PaymentChart = ({ data, selectedCategory, selectedMonth, onMonthSel
                 {formatCurrency(item.amount)}
               </p>
               <Badge variant="secondary" className="text-xs">
-                {item.amount === maxAmount ? "Maior" : ""}
+                {item.amount === maxAmount && maxAmount > 0 ? "Maior" : ""}
               </Badge>
             </div>
           </div>
         ))}
         
-        {data.length === 0 && (
+        {fullData.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             <p>Nenhum dado encontrado</p>
           </div>
@@ -167,11 +186,6 @@ export const PaymentChart = ({ data, selectedCategory, selectedMonth, onMonthSel
             <TrendingUp className="h-5 w-5 text-primary flex-shrink-0" />
             <span className="truncate">
               Histórico de Pagamentos
-              {selectedCategory && (
-                <span className="text-sm font-normal text-muted-foreground hidden sm:inline">
-                  - {selectedCategory}
-                </span>
-              )}
             </span>
           </CardTitle>
           
@@ -198,12 +212,7 @@ export const PaymentChart = ({ data, selectedCategory, selectedMonth, onMonthSel
           </div>
         </div>
         
-        {/* Categoria selecionada no mobile */}
-        {selectedCategory && (
-          <div className="text-sm text-muted-foreground sm:hidden">
-            Categoria: {selectedCategory}
-          </div>
-        )}
+        {/* Categoria selecionada no mobile removida para independência */}
         
         {/* Resumo dos dados */}
         <div className="flex gap-4 text-sm text-muted-foreground">
@@ -211,7 +220,7 @@ export const PaymentChart = ({ data, selectedCategory, selectedMonth, onMonthSel
             <span>Total: {formatCurrency(totalAmount)}</span>
           </div>
           <div>
-            <span>Períodos: {data.length}</span>
+            <span>Períodos: {fullData.length}</span>
           </div>
         </div>
       </CardHeader>

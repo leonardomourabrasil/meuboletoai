@@ -1,81 +1,78 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import { LucideIcon } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
-interface StatsCardProps {
+export interface StatsCardProps {
   title: string;
   value: string;
-  icon: LucideIcon;
+  icon: any;
   trend?: {
-    value: string;
-    isPositive: boolean;
+    value: number;
+    label: string;
+    absolute?: number; // novo: variação absoluta em reais
   };
-  variant?: "default" | "success" | "warning" | "destructive";
+  variant?: 'default' | 'success' | 'warning' | 'destructive';
   className?: string;
+  subtitle?: string; // novo campo opcional
 }
 
-export const StatsCard = ({ 
-  title, 
-  value, 
-  icon: Icon, 
-  trend, 
-  variant = "default",
-  className 
+export const StatsCard = ({
+  title,
+  value,
+  icon: Icon,
+  trend,
+  variant = 'default',
+  className = '',
+  subtitle
 }: StatsCardProps) => {
-  const getVariantStyles = () => {
-    switch (variant) {
-      case "success":
-        return "border-success/20 bg-success-light/20";
-      case "warning":
-        return "border-warning/20 bg-warning-light/20";
-      case "destructive":
-        return "border-destructive/20 bg-destructive-light/20";
-      default:
-        return "border-border bg-card";
-    }
-  };
+  const variantClasses = {
+    default: 'bg-card border-border',
+    success: 'bg-green-50 border-green-200',
+    warning: 'bg-yellow-50 border-yellow-200',
+    destructive: 'bg-red-50 border-red-200',
+  } as const;
 
-  const getIconStyles = () => {
-    switch (variant) {
-      case "success":
-        return "text-success bg-success/10";
-      case "warning":
-        return "text-warning bg-warning/10";
-      case "destructive":
-        return "text-destructive bg-destructive/10";
-      default:
-        return "text-primary bg-primary/10";
-    }
-  };
+  const iconColor =
+    variant === 'success'
+      ? 'text-green-600'
+      : variant === 'warning'
+      ? 'text-yellow-600'
+      : variant === 'destructive'
+      ? 'text-red-600'
+      : 'text-primary';
+
+  // Regra: aumento (valor positivo) = vermelho; queda (valor negativo) = verde; zero = neutro
+  const trendColor = trend
+    ? trend.value > 0
+      ? 'text-red-600'
+      : trend.value < 0
+      ? 'text-green-600'
+      : 'text-muted-foreground'
+    : 'text-muted-foreground';
+
+  const formatCurrencyBRL = (amount: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
 
   return (
-    <Card className={cn(
-      "transition-all duration-300 hover:shadow-lg hover:-translate-y-1",
-      getVariantStyles(),
-      className
-    )}>
+    <Card className={`${variantClasses[variant]} ${className}`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {title}
-        </CardTitle>
-        <div className={cn(
-          "rounded-lg p-2 transition-colors",
-          getIconStyles()
-        )}>
-          <Icon className="h-4 w-4" />
-        </div>
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className={`h-4 w-4 ${iconColor}`} />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-foreground">{value}</div>
+        <div className="text-2xl font-bold">{value}</div>
+        {subtitle && (
+          <div className="text-sm text-muted-foreground mt-1">{subtitle}</div>
+        )}
         {trend && (
-          <p className={cn(
-            "text-xs",
-            trend.isPositive ? "text-success" : "text-destructive"
-          )}>
-            {trend.isPositive ? "+" : ""}{trend.value} desde o mês passado
+          <p className={`text-xs mt-1 ${trendColor}`}>
+            {trend.value > 0 ? '+' : ''}
+            {trend.value}%
+            {typeof trend.absolute === 'number' && (
+              <> ({formatCurrencyBRL(trend.absolute)})</>
+            )}
+            {' '}{trend.label}
           </p>
         )}
       </CardContent>
     </Card>
   );
-};
+}

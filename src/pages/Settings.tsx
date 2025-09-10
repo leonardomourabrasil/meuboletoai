@@ -109,151 +109,19 @@ const Settings = () => {
       } else {
         toast({
           variant: "destructive",
-          title: "Falha ao enviar lembretes",
-          description: data?.error || `Status ${resp.status}`,
+          title: "Erro ao enviar lembretes",
+          description: data?.error || "Tente novamente mais tarde.",
         });
       }
-    } catch (e: any) {
+    } catch (error) {
       toast({
         variant: "destructive",
-        title: "Erro de rede",
-        description: "Verifique sua conexão ou rode 'vercel dev' para usar as rotas /api localmente.",
+        title: "Erro ao enviar lembretes",
+        description: "Tente novamente mais tarde.",
       });
     } finally {
       setSendingReminders(false);
     }
-  };
-
-  // Email validation
-  const isValidEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  // Phone number formatting
-  const formatPhoneNumber = (value: string) => {
-    const numbers = value.replace(/\D/g, "");
-    if (numbers.length <= 11) {
-      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
-    }
-    return value;
-  };
-
-  // Add email recipient
-  const addEmailRecipient = () => {
-    if (!newEmail.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Por favor, insira um endereço de e-mail.",
-      });
-      return;
-    }
-
-    if (!isValidEmail(newEmail)) {
-      toast({
-        variant: "destructive",
-        title: "E-mail inválido",
-        description: "Por favor, insira um endereço de e-mail válido.",
-      });
-      return;
-    }
-
-    // Check if email already exists
-    if (settings.emailRecipients.some(recipient => recipient.email === newEmail)) {
-      toast({
-        variant: "destructive",
-        title: "E-mail já existe",
-        description: "Este endereço de e-mail já foi adicionado.",
-      });
-      return;
-    }
-
-    const newRecipient: EmailRecipient = {
-      id: Date.now().toString(),
-      email: newEmail
-    };
-
-    const updatedSettings = {
-      ...settings,
-      emailRecipients: [...settings.emailRecipients, newRecipient]
-    };
-    
-    saveSettings(updatedSettings);
-    setNewEmail("");
-    toast({
-      title: "E-mail adicionado",
-      description: `${newEmail} foi adicionado à lista de destinatários.`,
-    });
-  };
-
-  // Remove email recipient
-  const removeEmailRecipient = (id: string) => {
-    const updatedSettings = {
-      ...settings,
-      emailRecipients: settings.emailRecipients.filter(recipient => recipient.id !== id)
-    };
-    
-    saveSettings(updatedSettings);
-    toast({
-      title: "E-mail removido",
-      description: "O destinatário foi removido da lista.",
-    });
-  };
-
-  // Add WhatsApp contact
-  const addWhatsAppContact = () => {
-    if (!newContactName.trim() || !newContactPhone.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Por favor, preencha o nome e o número do WhatsApp.",
-      });
-      return;
-    }
-
-    const phone = newContactPhone.replace(/\D/g, "");
-    if (phone.length < 10 || phone.length > 11) {
-      toast({
-        variant: "destructive",
-        title: "Número inválido",
-        description: "Por favor, insira um número de telefone válido.",
-      });
-      return;
-    }
-
-    const newContact: WhatsAppContact = {
-      id: Date.now().toString(),
-      name: newContactName,
-      phone: newContactPhone
-    };
-
-    const updatedSettings = {
-      ...settings,
-      whatsappContacts: [...settings.whatsappContacts, newContact]
-    };
-    
-    saveSettings(updatedSettings);
-    setNewContactName("");
-    setNewContactPhone("");
-    toast({
-      title: "Contato adicionado",
-      description: `${newContactName} foi adicionado à lista de contatos.`,
-    });
-  };
-
-  // Remove WhatsApp contact
-  const removeWhatsAppContact = (id: string) => {
-    const updatedSettings = {
-      ...settings,
-      whatsappContacts: settings.whatsappContacts.filter(contact => contact.id !== id)
-    };
-    
-    saveSettings(updatedSettings);
-    toast({
-      title: "Contato removido",
-      description: "O contato foi removido da lista.",
-    });
   };
 
   // Handle phone input change
@@ -271,6 +139,84 @@ const Settings = () => {
         : [...settings.reminderDaysBefore, days].sort((a, b) => a - b)
     };
     
+    saveSettings(updatedSettings);
+  };
+
+  // Alterar janela de próximos vencimentos (Dashboard)
+  const handleUpcomingWindowChange = (days: number) => {
+    const updatedSettings: UserSettings = {
+      ...settings,
+      upcomingWindowDays: days,
+    };
+    saveSettings(updatedSettings);
+  };
+
+  // Novas funções para restaurar seções
+  const handleProviderChange = (value: string) => {
+    const updatedSettings: UserSettings = {
+      ...settings,
+      aiProvider: value as AIProvider,
+    };
+    saveSettings(updatedSettings);
+  };
+
+  const addEmailRecipient = () => {
+    const email = newEmail.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({ variant: "destructive", title: "E-mail inválido", description: "Informe um e-mail válido." });
+      return;
+    }
+    if (settings.emailRecipients.some((r) => r.email.toLowerCase() === email.toLowerCase())) {
+      toast({ title: "E-mail já adicionado", description: email });
+      return;
+    }
+    const updatedSettings: UserSettings = {
+      ...settings,
+      emailRecipients: [...settings.emailRecipients, { id: email, email }],
+    };
+    saveSettings(updatedSettings);
+    setNewEmail("");
+  };
+
+  const removeEmailRecipient = (id: string) => {
+    const updatedSettings: UserSettings = {
+      ...settings,
+      emailRecipients: settings.emailRecipients.filter((r) => r.id !== id),
+    };
+    saveSettings(updatedSettings);
+  };
+
+  const addWhatsAppContact = () => {
+    const name = newContactName.trim();
+    const phone = newContactPhone.trim();
+    const digits = phone.replace(/\D/g, "");
+    if (!name) {
+      toast({ variant: "destructive", title: "Nome obrigatório", description: "Informe o nome do contato." });
+      return;
+    }
+    if (digits.length < 10) {
+      toast({ variant: "destructive", title: "Telefone inválido", description: "Informe um telefone válido (DDD + número)." });
+      return;
+    }
+    if (settings.whatsappContacts.some((c) => c.phone.replace(/\D/g, "") === digits)) {
+      toast({ title: "Contato já adicionado", description: phone });
+      return;
+    }
+    const updatedSettings: UserSettings = {
+      ...settings,
+      whatsappContacts: [...settings.whatsappContacts, { id: digits, name, phone }],
+    };
+    saveSettings(updatedSettings);
+    setNewContactName("");
+    setNewContactPhone("");
+  };
+
+  const removeWhatsAppContact = (id: string) => {
+    const updatedSettings: UserSettings = {
+      ...settings,
+      whatsappContacts: settings.whatsappContacts.filter((c) => c.id !== id),
+    };
     saveSettings(updatedSettings);
   };
 
@@ -310,135 +256,173 @@ const Settings = () => {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label htmlFor="notifications-toggle" className="text-base font-medium">
-                    Habilitar Notificações
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Controle mestre para todas as notificações do sistema
-                  </p>
+                <div className="space-y-1 pr-4">
+                  <Label className="text-base font-medium">Ativar notificações</Label>
+                  <p className="text-sm text-muted-foreground">Controla todos os lembretes e envios</p>
+                </div>
+                <Switch checked={settings.notificationsEnabled} onCheckedChange={(v) => saveSettings({ ...settings, notificationsEnabled: v })} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Notificações de Pagamento */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-primary" />
+                Notificações de Pagamento
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1 pr-4">
+                  <Label className="text-base font-medium">Alertas de pagamento realizado</Label>
+                  <p className="text-sm text-muted-foreground">Receba confirmação quando um boleto for marcado como pago</p>
                 </div>
                 <Switch
-                  id="notifications-toggle"
-                  checked={settings.notificationsEnabled}
-                  onCheckedChange={(checked) => {
-                    const updatedSettings = { ...settings, notificationsEnabled: checked };
-                    saveSettings(updatedSettings);
-                  }}
+                  checked={settings.paymentNotificationsEnabled}
+                  onCheckedChange={(v) => saveSettings({ ...settings, paymentNotificationsEnabled: v })}
+                  disabled={!settings.notificationsEnabled}
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Email Recipients */}
+          {/* Integração com IA */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-primary" />
+                Integração com IA
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Provedor</Label>
+                  <Select value={settings.aiProvider} onValueChange={handleProviderChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o provedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(AI_PROVIDERS).map((p) => (
+                        <SelectItem key={p.name} value={p.name}>
+                          {p.displayName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Chave da API</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="password"
+                      placeholder="Cole sua chave da API"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      disabled={!settings.notificationsEnabled}
+                    />
+                    <Button onClick={handleSaveSettings} disabled={!settings.notificationsEnabled}>
+                      <Key className="h-4 w-4 mr-2" />
+                      Salvar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Sua chave é salva apenas no seu navegador ou na sua conta, nunca é exposta no código.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Destinatários de E-mail */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Mail className="h-5 w-5 text-primary" />
-                Destinatários de E-mail para Lembretes
+                Destinatários de E-mail
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    type="email"
-                    placeholder="exemplo@email.com"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addEmailRecipient()}
-                  />
-                </div>
-                <Button onClick={addEmailRecipient} className="shrink-0">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Adicionar E-mail
+                <Input
+                  type="email"
+                  placeholder="exemplo@dominio.com"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  disabled={!settings.notificationsEnabled}
+                />
+                <Button onClick={addEmailRecipient} disabled={!settings.notificationsEnabled || !newEmail.trim()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar
                 </Button>
               </div>
 
-              {settings.emailRecipients.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">E-mails cadastrados:</Label>
+              <div className="space-y-2">
+                {settings.emailRecipients.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum e-mail adicionado.</p>
+                ) : (
                   <div className="space-y-2">
-                    {settings.emailRecipients.map((recipient) => (
-                      <div
-                        key={recipient.id}
-                        className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{recipient.email}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeEmailRecipient(recipient.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
+                    {settings.emailRecipients.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between rounded-md border border-border p-2">
+                        <span className="text-sm">{r.email}</span>
+                        <Button variant="ghost" size="icon" onClick={() => removeEmailRecipient(r.id)} disabled={!settings.notificationsEnabled}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </CardContent>
           </Card>
 
-          {/* WhatsApp Recipients */}
+          {/* Contatos de WhatsApp */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 text-primary" />
-                Destinatários de WhatsApp para Lembretes
+                Contatos de WhatsApp
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 <Input
-                  placeholder="Nome do contato"
+                  placeholder="Nome"
                   value={newContactName}
                   onChange={(e) => setNewContactName(e.target.value)}
+                  disabled={!settings.notificationsEnabled}
                 />
                 <Input
-                  placeholder="(XX) XXXXX-XXXX"
+                  placeholder="(11) 91234-5678"
                   value={newContactPhone}
                   onChange={(e) => handlePhoneChange(e.target.value)}
-                  maxLength={15}
+                  disabled={!settings.notificationsEnabled}
                 />
-                <Button onClick={addWhatsAppContact} className="w-full">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Adicionar Contato
+                <Button onClick={addWhatsAppContact} disabled={!settings.notificationsEnabled || !newContactName.trim() || !newContactPhone.trim()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar
                 </Button>
               </div>
 
-              {settings.whatsappContacts.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Contatos cadastrados:</Label>
+              <div className="space-y-2">
+                {settings.whatsappContacts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum contato adicionado.</p>
+                ) : (
                   <div className="space-y-2">
-                    {settings.whatsappContacts.map((contact) => (
-                      <div
-                        key={contact.id}
-                        className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {contact.name} - {contact.phone}
-                          </span>
+                    {settings.whatsappContacts.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between rounded-md border border-border p-2">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{c.name}</span>
+                          <span className="text-xs text-muted-foreground">{c.phone}</span>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeWhatsAppContact(contact.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => removeWhatsAppContact(c.id)} disabled={!settings.notificationsEnabled}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -494,63 +478,42 @@ const Settings = () => {
                     * Os lembretes são cancelados automaticamente se o boleto for pago antes da data
                   </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Payment Notifications */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-primary" />
-                Notificações de Pagamento
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label htmlFor="payment-notifications" className="text-base font-medium">
-                    Notificar Pagamentos Realizados
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receba notificação por e-mail e WhatsApp quando um boleto for pago
-                  </p>
-                </div>
-                <Switch
-                  id="payment-notifications"
-                  checked={settings.paymentNotificationsEnabled}
-                  onCheckedChange={(checked) => {
-                    const updatedSettings = { ...settings, paymentNotificationsEnabled: checked };
-                    saveSettings(updatedSettings);
-                  }}
-                />
-              </div>
-              
-              {settings.paymentNotificationsEnabled && (
-                <div className="p-3 bg-muted/30 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-green-600">
-                      Notificações de pagamento ativadas
-                    </span>
+                <Separator className="my-4" />
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-base font-medium">
+                      Janela para "Próximos Vencimentos" (Dashboard)
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Defina quantos dias considerar ao mostrar os próximos vencimentos no painel
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    As notificações incluirão: nome do boleto, categoria, valor pago e data do pagamento
-                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[3, 7, 14, 30].map((days) => (
+                      <Button
+                        key={days}
+                        variant={settings.upcomingWindowDays === days ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleUpcomingWindowChange(days)}
+                        className="w-full"
+                      >
+                        {days} dias
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm">
+                        Atualmente configurado para {settings.upcomingWindowDays} dia{settings.upcomingWindowDays > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
 
-          {/* Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BellRing className="h-5 w-5 text-primary" />
-                Ações
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+              <Separator />
               <div className="flex items-center justify-between">
                 <div className="space-y-1 pr-4">
                   <Label className="text-base font-medium">Enviar lembretes de hoje</Label>
@@ -578,102 +541,6 @@ const Settings = () => {
                   </div>
                 </div>
               )}
-              {!settings.notificationsEnabled && (
-                <p className="text-xs text-muted-foreground">
-                  Ative as notificações gerais para habilitar esta ação.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* AI API Configuration */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bot className="h-5 w-5 text-primary" />
-                Configuração da IA
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="ai-provider">Provedor de IA</Label>
-                <Select
-                  value={settings.aiProvider}
-                  onValueChange={(value: AIProvider) => {
-                    const updatedSettings = { ...settings, aiProvider: value };
-                    saveSettings(updatedSettings);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o provedor de IA" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
-                      <SelectItem key={key} value={key}>
-                        {provider.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Escolha o provedor de IA para análise automática de boletos
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="api-key">
-                  Chave da API - {AI_PROVIDERS[settings.aiProvider].displayName}
-                </Label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Input
-                      id="api-key"
-                      type="password"
-                      placeholder={`Insira sua chave da API ${AI_PROVIDERS[settings.aiProvider].displayName}`}
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                    />
-                  </div>
-                  <Button variant="outline" className="shrink-0">
-                    <Key className="h-4 w-4 mr-1" />
-                    Validar
-                  </Button>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">
-                    Configure sua chave de API para análise automática de boletos usando {AI_PROVIDERS[settings.aiProvider].displayName}.
-                  </p>
-                  {settings.aiProvider === 'openai' && (
-                    <p className="text-xs text-blue-600">
-                      🔗 Obtenha sua chave em: <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline">platform.openai.com/api-keys</a>
-                    </p>
-                  )}
-                  {settings.aiProvider === 'gemini' && (
-                    <p className="text-xs text-blue-600">
-                      🔗 Obtenha sua chave em: <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline">makersuite.google.com/app/apikey</a>
-                    </p>
-                  )}
-                  {settings.aiProvider === 'claude' && (
-                    <p className="text-xs text-blue-600">
-                      🔗 Obtenha sua chave em: <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="underline">console.anthropic.com</a>
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {apiKey && (
-                <div className="p-3 bg-muted/30 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Key className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-green-600">
-                      Chave da API {AI_PROVIDERS[settings.aiProvider].displayName} configurada
-                    </span>
-                    <Badge variant="secondary" className="text-xs">
-                      Ativa
-                    </Badge>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -693,3 +560,11 @@ const Settings = () => {
 };
 
 export default Settings;
+
+// Helpers
+function formatPhoneNumber(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+}

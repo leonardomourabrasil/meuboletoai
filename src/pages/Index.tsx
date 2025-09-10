@@ -14,6 +14,7 @@ import { DollarSign, CreditCard, TrendingUp, Calendar, Settings, LogOut } from "
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBills, BillForDisplay } from "@/hooks/useBills";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 // Real payment history data will be calculated from user's actual bills
 type MonthlyPaymentData = {
@@ -23,10 +24,16 @@ type MonthlyPaymentData = {
 
 const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { bills, loading: billsLoading, addBill, updateBillStatus, deleteBill } = useBills();
+  const { bills, loading: billsLoading, addBill, addRetroBill, updateBillStatus, deleteBill } = useBills();
+  const { settings } = useUserSettings();
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [categoryPeriod, setCategoryPeriod] = useState<{
+    preset: 'total' | 'custom' | 'mensal' | 'trimestral' | 'semestral' | 'anual';
+    startDate?: Date;
+    endDate?: Date;
+  }>({ preset: 'total' });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -42,45 +49,66 @@ const Index = () => {
     // Todas as contas pendentes (independente do mês)
     const allPendingBills = bills.filter(bill => bill.status === "pending");
 
-    // Contas pagas apenas do mês atual (para o card "Total Pago (Mês)")
+    // Contas pagas apenas do mês atual (agora por paidAt)
     const paidBills = bills.filter(bill => {
       if (bill.status !== "paid" || !bill.paidAt) return false;
-      
       const paidDate = new Date(bill.paidAt);
-      return paidDate.getMonth() === currentMonth && 
-             paidDate.getFullYear() === currentYear;
+      return paidDate.getMonth() === currentMonth && paidDate.getFullYear() === currentYear;
     });
 
-    // Todas as contas pagas (para o novo card "Valor Total Pago Geral")
+    // Todas as contas pagas (para o card "Valor Total Pago Geral")
     const allPaidBills = bills.filter(bill => bill.status === "paid");
 
     const totalPending = allPendingBills.reduce((sum, bill) => sum + (bill.amount - (bill.discount || 0)), 0);
     const totalPaid = paidBills.reduce((sum, bill) => sum + (bill.amount - (bill.discount || 0)), 0);
     const totalPaidOverall = allPaidBills.reduce((sum, bill) => sum + (bill.amount - (bill.discount || 0)), 0);
 
-    // Get bills due in next 7 days para o card "Próximos Vencimentos"
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
+    // Próximos vencimentos usando janela configurável (inclui vencidos)
+    const windowDays = settings?.upcomingWindowDays ?? 7;
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() + windowDays);
+
     const upcomingBills = allPendingBills.filter(bill => {
       const dueDate = new Date(bill.dueDate);
-      return dueDate <= nextWeek;
+      return dueDate <= limitDate; // mantém lógica incluindo datas passadas
     });
+    const upcomingTotal = upcomingBills.reduce((sum, bill) => sum + (bill.amount - (bill.discount || 0)), 0);
 
     return {
       totalPending,
       totalPaid,
       totalPaidOverall,
-      upcomingCount: upcomingBills.length
+      upcomingCount: upcomingBills.length,
+      upcomingTotal,
     };
-  }, [bills]);
+  }, [bills, settings?.upcomingWindowDays]);
 
   const categoryData = useMemo(() => {
+    const { startDate: start, endDate: end, preset } = categoryPeriod;
+
     const categoryMap = new Map<string, { amount: number; count: number }>();
-    
-    bills.forEach(bill => {
+
+    const eligibleBills = bills.filter(bill => {
+      if (bill.status !== 'paid' || !bill.category) return false;
+      // Total: sem filtro de data
+      if (preset === 'total') return true;
+      // Custom sem intervalo completo => vazio
+      if (preset === 'custom' && (!start || !end)) return false;
+
+      // Ao clicar no histórico, usamos a base por dueDate para manter consistência com o gráfico de Histórico de Pagamentos
+      const basisDateStr = (preset === 'custom') ? bill.dueDate : bill.paidAt;
+      if (!basisDateStr) return false;
+      const basisDate = new Date(basisDateStr);
+      if (start && basisDate < start) return false;
+      if (end && basisDate > end) return false;
+      return true;
+    });
+
+    eligibleBills.forEach(bill => {
       const current = categoryMap.get(bill.category) || { amount: 0, count: 0 };
+      const netAmount = bill.amount - (bill.discount || 0);
       categoryMap.set(bill.category, {
-        amount: current.amount + bill.amount,
+        amount: current.amount + netAmount,
         count: current.count + 1
       });
     });
@@ -90,56 +118,160 @@ const Index = () => {
       amount: data.amount,
       count: data.count
     }));
+  }, [bills, categoryPeriod]);
+
+  // HISTÓRICO DE PAGAMENTOS: agrupar por dueDate (sempre considerar o mês de vencimento)
+  const paymentHistoryData = useMemo(() => {
+    const paidBills = bills.filter(bill => bill.status === 'paid');
+
+    const monthsOrder = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+    // Inicializa todos os meses com 0
+    const monthlyData = monthsOrder.reduce((acc: Record<string, number>, m) => {
+      acc[m] = 0;
+      return acc;
+    }, {} as Record<string, number>);
+
+    paidBills.forEach((bill) => {
+      const basisDate = new Date(bill.dueDate);
+      const short = basisDate.toLocaleDateString('pt-BR', { month: 'short' });
+      // Normaliza para tirar ponto final (ex.: "Set.") e capitaliza a primeira letra
+      const key = (short.charAt(0).toUpperCase() + short.slice(1)).replace('.', '');
+      const netAmount = bill.amount - (bill.discount || 0);
+
+      if (key in monthlyData) {
+        monthlyData[key] += netAmount;
+      }
+    });
+
+    return monthsOrder.map((m) => ({ month: m, amount: monthlyData[m] }));
   }, [bills]);
 
-  const paymentHistoryData = useMemo(() => {
-    // Group paid bills by month and calculate totals
-    const paidBills = bills.filter(bill => bill.status === 'paid');
-    
-    if (paidBills.length === 0) {
-      return [];
+  // Helper: rótulo do mês -> intervalo daquele mês no ano atual
+  const monthLabelToRange = (label: string) => {
+    const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const key = label.replace('.', '');
+    const idx = months.indexOf(key);
+    const year = new Date().getFullYear();
+    const start = new Date(year, idx, 1);
+    const end = new Date(year, idx + 1, 0);
+    return { start, end };
+  };
+
+  // Clique no mês: define período customizado; desmarcar: volta para total
+  const handleMonthSelect = (month: string | null) => {
+    setSelectedMonth(month);
+    if (month) {
+      const { start, end } = monthLabelToRange(month);
+      setCategoryPeriod({ preset: 'custom', startDate: start, endDate: end });
+    } else {
+      setCategoryPeriod({ preset: 'total' });
     }
+  };
 
-    // Group bills by month
-    const monthlyData = paidBills.reduce((acc: Record<string, number>, bill) => {
-      const month = new Date(bill.dueDate).toLocaleDateString('pt-BR', { month: 'short' });
-      const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
-      
-      const netAmount = bill.amount - (bill.discount || 0);
-      
-      if (!selectedCategory) {
-        // Sum all categories (using net amount)
-        acc[capitalizedMonth] = (acc[capitalizedMonth] || 0) + netAmount;
-      } else {
-        // Filter by selected category (using net amount)
-        if (bill.category === selectedCategory) {
-          acc[capitalizedMonth] = (acc[capitalizedMonth] || 0) + netAmount;
-        }
-      }
-      
-      return acc;
-    }, {});
+  const selectedMonthRange = useMemo(() => {
+    if (!selectedMonth) return null;
+    const { start, end } = monthLabelToRange(selectedMonth);
+    return { startDate: start, endDate: end };
+  }, [selectedMonth]);
 
-    // Convert to array format expected by the chart
-    return Object.entries(monthlyData)
-      .map(([month, amount]) => ({ month, amount }))
-      .sort((a, b) => {
-        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        return months.indexOf(a.month) - months.indexOf(b.month);
-      });
-  }, [bills, selectedCategory]);
+  // Rótulo dinâmico do mês selecionado, ex.: "Mensal (Agosto)"
+  const selectedMonthLabel = useMemo(() => {
+    if (!selectedMonth) return undefined;
+    const { start } = monthLabelToRange(selectedMonth);
+    let name = start.toLocaleDateString('pt-BR', { month: 'long' });
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+    return `Mensal (${name})`;
+  }, [selectedMonth]);
 
-  // Filter bills by selected month if applicable
+  // Ordem e chaves de meses iguais às do gráfico
+  const monthsOrder = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const currentMonthKey = useMemo(() => {
+    const m = new Date().toLocaleDateString('pt-BR', { month: 'short' });
+    return (m.charAt(0).toUpperCase() + m.slice(1)).replace('.', '');
+  }, []);
+  const previousMonthKey = useMemo(() => {
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const m = prev.toLocaleDateString('pt-BR', { month: 'short' });
+    return (m.charAt(0).toUpperCase() + m.slice(1)).replace('.', '');
+  }, []);
+  // Removida declaração duplicada de previousMonthKey que usava monthsOrder
+  
+  // TOTAL PAGO (MÊS) — sincronizado com o gráfico (por paidAt)
+  const totalPaidCurrentMonthFromChart = useMemo(() => {
+    const item = paymentHistoryData.find(d => d.month === currentMonthKey) as { month: string; amount: number } | undefined;
+    return item ? Number(item.amount) : 0;
+  }, [paymentHistoryData, currentMonthKey]);
+  const totalPaidPreviousMonthFromChart = useMemo(() => {
+    const item = paymentHistoryData.find(d => d.month === previousMonthKey) as { month: string; amount: number } | undefined;
+    return item ? Number(item.amount) : 0;
+  }, [paymentHistoryData, previousMonthKey]);
+  const paidMoMPercentRaw = useMemo(() => {
+    const prev = totalPaidPreviousMonthFromChart;
+    const curr = totalPaidCurrentMonthFromChart;
+    if (prev === 0) return curr > 0 ? 100 : 0;
+    return ((curr - prev) / prev) * 100;
+  }, [totalPaidPreviousMonthFromChart, totalPaidCurrentMonthFromChart]);
+  const paidAbsDiff = useMemo(() => Math.abs(totalPaidCurrentMonthFromChart - totalPaidPreviousMonthFromChart), [totalPaidCurrentMonthFromChart, totalPaidPreviousMonthFromChart]);
+  const paidTrend = useMemo(() => {
+    const percentage = Number(paidMoMPercentRaw.toFixed(0));
+    return { value: percentage, label: 'vs mês anterior', absolute: paidAbsDiff };
+  }, [paidMoMPercentRaw, paidAbsDiff]);
+
+  // TOTAL A PAGAR (Mês)
+  // 1) Mapa só de pendências (valor exibido no card)
+  const pendingMonthlyMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    bills.filter(b => b.status === 'pending').forEach(b => {
+      const m = new Date(b.dueDate).toLocaleDateString('pt-BR', { month: 'short' });
+      const key = (m.charAt(0).toUpperCase() + m.slice(1)).replace('.', '');
+      const net = b.amount - (b.discount || 0);
+      map[key] = (map[key] || 0) + net;
+    });
+    return map;
+  }, [bills]);
+  const totalPendingCurrentMonth = pendingMonthlyMap[currentMonthKey] ?? 0;
+  const totalPendingPreviousMonth = pendingMonthlyMap[previousMonthKey] ?? 0;
+
+  // 2) Mapa com TODOS os boletos (pendentes + pagos) por dueDate — para trend considerar retroativos
+  const allBillsMonthlyMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    bills.forEach(b => {
+      const m = new Date(b.dueDate).toLocaleDateString('pt-BR', { month: 'short' });
+      const key = (m.charAt(0).toUpperCase() + m.slice(1)).replace('.', '');
+      const net = b.amount - (b.discount || 0);
+      map[key] = (map[key] || 0) + net;
+    });
+    return map;
+  }, [bills]);
+  const totalAllCurrentMonth = allBillsMonthlyMap[currentMonthKey] ?? 0;
+  const totalAllPreviousMonth = allBillsMonthlyMap[previousMonthKey] ?? 0;
+
+  const pendingMoMPercentRaw = useMemo(() => {
+    const prev = totalAllPreviousMonth;
+    const curr = totalAllCurrentMonth;
+    if (prev === 0) return curr > 0 ? 100 : 0;
+    return ((curr - prev) / prev) * 100;
+  }, [totalAllPreviousMonth, totalAllCurrentMonth]);
+  // Para "a pagar", queda é positiva (verde)
+  const pendingAbsDiff = useMemo(() => Math.abs(totalAllCurrentMonth - totalAllPreviousMonth), [totalAllCurrentMonth, totalAllPreviousMonth]);
+  const pendingTrend = useMemo(() => {
+    const percentage = Number(pendingMoMPercentRaw.toFixed(0)); // sem inversão: + pior (vermelho), - melhor (verde)
+    return { value: percentage, label: 'vs mês anterior', absolute: pendingAbsDiff };
+  }, [pendingMoMPercentRaw, pendingAbsDiff]);
+
+  // Filter bills by selected month (sempre por dueDate)
   const filteredBillsByMonth = useMemo(() => {
     if (!selectedMonth) return bills;
-    
+    const monthMap: { [key: string]: number } = {
+      'Jan': 0, 'Fev': 1, 'Mar': 2, 'Abr': 3, 'Mai': 4, 'Jun': 5,
+      'Jul': 6, 'Ago': 7, 'Set': 8, 'Out': 9, 'Nov': 10, 'Dez': 11
+    };
+    const key = selectedMonth.replace('.', '');
     return bills.filter(bill => {
-      const billDate = new Date(bill.dueDate);
-      const monthMap: { [key: string]: number } = {
-        'Jan': 0, 'Fev': 1, 'Mar': 2, 'Abr': 3, 'Mai': 4, 'Jun': 5,
-        'Jul': 6, 'Ago': 7, 'Set': 8, 'Out': 9, 'Nov': 10, 'Dez': 11
-      };
-      return billDate.getMonth() === monthMap[selectedMonth];
+      const basisDate = new Date(bill.dueDate);
+      return basisDate.getMonth() === monthMap[key];
     });
   }, [bills, selectedMonth]);
 
@@ -165,6 +297,9 @@ const Index = () => {
   const handleAddBill = (newBill: Omit<BillForDisplay, "id" | "status">) => {
     addBill(newBill);
   };
+  const handleAddRetroBill = (retroBill: Omit<BillForDisplay, "id" | "status"> & { paidAt: string }) => {
+    addRetroBill(retroBill);
+  };
 
   const filteredBills = useMemo(() => {
     let result = selectedMonth ? filteredBillsByMonth : bills;
@@ -176,9 +311,8 @@ const Index = () => {
 
   const pendingBills = filteredBills.filter(bill => bill.status === "pending")
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  
-  const paidBills = filteredBills.filter(bill => bill.status === "paid")
-    .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+  const paidBillsList = filteredBills.filter(bill => bill.status === "paid")
+    .sort((a, b) => new Date((b.paidAt ?? b.dueDate)).getTime() - new Date((a.paidAt ?? a.dueDate)).getTime());
 
   if (authLoading || billsLoading) {
     return (
@@ -258,30 +392,25 @@ const Index = () => {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <StatsCard
-            title="Total a Pagar"
-            value={formatCurrency(stats.totalPending)}
+            title="Total a Pagar (Mês)"
+            value={formatCurrency(totalPendingCurrentMonth)}
             icon={DollarSign}
             variant="warning"
-            trend={{
-              value: "12%",
-              isPositive: false
-            }}
+            trend={pendingTrend}
           />
           <StatsCard
             title="Total Pago (Mês)"
-            value={formatCurrency(stats.totalPaid)}
+            value={formatCurrency(totalPaidCurrentMonthFromChart)}
             icon={CreditCard}
             variant="success"
-            trend={{
-              value: "8%",
-              isPositive: true
-            }}
+            trend={paidTrend}
           />
           <StatsCard
             title="Próximos Vencimentos"
             value={stats.upcomingCount.toString()}
             icon={Calendar}
             variant="destructive"
+            subtitle={formatCurrency(stats.upcomingTotal)}
           />
           <StatsCard
             title="Valor Total Pago Geral"
@@ -299,7 +428,7 @@ const Index = () => {
               data={paymentHistoryData} 
               selectedCategory={selectedCategory}
               selectedMonth={selectedMonth}
-              onMonthSelect={setSelectedMonth}
+              onMonthSelect={handleMonthSelect}
             />
           </div>
           
@@ -307,13 +436,15 @@ const Index = () => {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
             {/* Category Chart with flexible height */}
             <div className="min-h-[350px] h-[400px] sm:h-[450px] xl:h-[500px]">
-              <CategoryChart data={categoryData} />
+              <CategoryChart data={categoryData} basisLabel={selectedMonth ? selectedMonthLabel : undefined} />
             </div>
             {/* Total Spending Chart with matching height */}
             <div className="min-h-[350px] h-[400px] sm:h-[450px] xl:h-[500px]">
               <TotalSpendingByCategory 
                 data={categoryData} 
                 bills={bills}
+                externalRange={selectedMonthRange}
+                externalBasis="dueDate"
               />
             </div>
           </div>
@@ -326,13 +457,14 @@ const Index = () => {
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
           />
+          {/* Removido aviso de filtro por mês para manter independência entre seções */}
           {selectedMonth && (
             <div className="mt-2 flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
                 Filtrado por mês: <strong>{selectedMonth}</strong>
               </span>
               <button
-                onClick={() => setSelectedMonth(null)}
+                onClick={() => handleMonthSelect(null)}
                 className="text-xs text-primary hover:underline"
               >
                 Limpar filtro
@@ -354,11 +486,14 @@ const Index = () => {
           </div>
           <div className="h-[400px] sm:h-[450px] md:h-[500px] lg:h-[550px]">
             <BillsList
-              bills={paidBills}
+              bills={paidBillsList}
               onBillStatusChange={handleBillStatusChange}
               onBillDelete={handleDeleteBill}
               title="Contas Pagas"
               showCheckbox={false}
+              extraAction={
+                <AddBillModal retro onAddBill={handleAddBill} onAddRetroBill={handleAddRetroBill} />
+              }
             />
           </div>
         </div>

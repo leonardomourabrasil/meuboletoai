@@ -17,13 +17,16 @@ import { isPdfFile, convertPdfToJpeg } from "@/lib/pdf-converter";
 
 interface AddBillModalProps {
   onAddBill: (bill: Omit<BillForDisplay, "id" | "status">) => void;
+  retro?: boolean; // novo: modo retroativo
+  onAddRetroBill?: (bill: Omit<BillForDisplay, "id" | "status"> & { paidAt: string }) => void; // callback para retroativo
 }
 
-export const AddBillModal = ({ onAddBill }: AddBillModalProps) => {
+export const AddBillModal = ({ onAddBill, retro = false, onAddRetroBill }: AddBillModalProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [beneficiary, setBeneficiary] = useState("");
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState<Date>();
+  const [paymentDate, setPaymentDate] = useState<Date>(); // novo
   const [category, setCategory] = useState("");
   const [barcode, setBarcode] = useState("");
   const [discount, setDiscount] = useState("");
@@ -40,36 +43,41 @@ export const AddBillModal = ({ onAddBill }: AddBillModalProps) => {
     e.preventDefault();
     
     // Se estiver no modo upload e tiver arquivo, mas campos vazios, mostrar aviso
-    if (uploadMode === "upload" && selectedFile && (!beneficiary || !amount || !dueDate)) {
-      // Permitir submit mesmo sem todos os campos preenchidos quando há arquivo
-      // pois em breve a IA preencherá automaticamente
+    if (uploadMode === "upload" && selectedFile && (!beneficiary || !amount || !dueDate || (retro && !paymentDate))) {
+      // permitir submit após IA preencher
     }
     
-    // Se estiver no modo manual, exigir todos os campos
-    if (uploadMode === "manual" && (!beneficiary || !amount || !dueDate)) {
+    // Se estiver no modo manual, exigir todos os campos (e paymentDate no modo retro)
+    if (uploadMode === "manual" && (!beneficiary || !amount || !dueDate || (retro && !paymentDate))) {
       return;
     }
     
-    // Se não há arquivo e não há dados manuais, não permitir
-    if (!selectedFile && (!beneficiary || !amount || !dueDate)) {
+    // Se não há arquivo e não há dados manuais suficientes
+    if (!selectedFile && (!beneficiary || !amount || !dueDate || (retro && !paymentDate))) {
       return;
     }
 
-    const bill = {
+    const base = {
       beneficiary: beneficiary || `Boleto ${selectedFile?.name?.split('.')[0] || 'Importado'}`,
       amount: amount ? parseFloat(amount.replace(/[^\d,]/g, '').replace(',', '.')) : 0,
       dueDate: dueDate ? dueDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       category: category || "Importado",
       barcode: barcode || "",
       discount: discount ? parseFloat(discount.replace(/[^\d,]/g, '').replace(',', '.')) : 0
-    };
+    } as const;
 
-    onAddBill(bill);
+    if (retro && onAddRetroBill) {
+      const paidAt = (paymentDate ?? new Date()).toISOString().split('T')[0];
+      onAddRetroBill({ ...base, paidAt });
+    } else {
+      onAddBill(base);
+    }
     
     // Reset form
     setBeneficiary("");
     setAmount("");
     setDueDate(undefined);
+    setPaymentDate(undefined);
     setCategory("");
     setBarcode("");
     setDiscount("");
@@ -244,13 +252,13 @@ export const AddBillModal = ({ onAddBill }: AddBillModalProps) => {
           className="h-8 sm:h-9 px-2 sm:px-3 gap-1 sm:gap-2 text-xs sm:text-sm min-w-[80px] sm:min-w-[120px]"
         >
           <Plus className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-          <span className="hidden sm:inline">Nova Conta</span>
-          <span className="sm:hidden">Nova</span>
+          <span className="hidden sm:inline">{retro ? 'Adicionar Retroativo' : 'Nova Conta'}</span>
+          <span className="sm:hidden">{retro ? 'Retroativo' : 'Nova'}</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto sm:w-full">
         <DialogHeader className="pb-4">
-          <DialogTitle className="text-lg sm:text-xl">Adicionar Nova Conta</DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">{retro ? 'Adicionar Contas Pagas (Retroativo)' : 'Adicionar Nova Conta'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {/* Upload/Manual Toggle */}
@@ -262,7 +270,7 @@ export const AddBillModal = ({ onAddBill }: AddBillModalProps) => {
               onClick={() => setUploadMode("upload")}
               className="flex-1 text-xs sm:text-sm"
             >
-              Upload de Boleto
+              {retro ? 'Comprovante' : 'Upload de Boleto'}
             </Button>
             <Button
               type="button"
@@ -271,7 +279,7 @@ export const AddBillModal = ({ onAddBill }: AddBillModalProps) => {
               onClick={() => setUploadMode("manual")}
               className="flex-1 text-xs sm:text-sm"
             >
-              Preencher Manualmente
+              {retro ? 'Preencher Dados' : 'Preencher Manualmente'}
             </Button>
           </div>
 
@@ -284,7 +292,7 @@ export const AddBillModal = ({ onAddBill }: AddBillModalProps) => {
             />
           )}
           
-          {/* Show manual fields always, but with different styling based on mode */}
+          {/* Campos manuais */}
           <div className={cn(
             "space-y-4 transition-opacity",
             uploadMode === "upload" && selectedFile ? "opacity-75" : "opacity-100"
@@ -408,6 +416,40 @@ export const AddBillModal = ({ onAddBill }: AddBillModalProps) => {
               </Popover>
             </div>
 
+            {retro && (
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label className="text-sm">
+                  Data de Pagamento *
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal text-sm h-9 sm:h-10",
+                        !paymentDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                      <span className="truncate">
+                        {paymentDate ? format(paymentDate, "dd 'de' MMM 'de' yyyy", { locale: ptBR }) : "Selecione uma data"}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start" sideOffset={4}>
+                    <Calendar
+                      mode="single"
+                      selected={paymentDate}
+                      onSelect={setPaymentDate}
+                      initialFocus
+                      locale={ptBR}
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">Obrigatória para lançamento retroativo</p>
+              </div>
+            )}
             <div className="space-y-1.5 sm:space-y-2">
               <Label htmlFor="category" className="text-sm">Categoria (opcional)</Label>
               <Input
@@ -458,7 +500,7 @@ export const AddBillModal = ({ onAddBill }: AddBillModalProps) => {
               type="submit" 
               className="flex-1 text-sm h-9 sm:h-10"
             >
-              {uploadMode === "upload" && selectedFile ? "Salvar Boleto" : "Adicionar Conta"}
+              {retro ? 'Adicionar Retroativo' : (uploadMode === "upload" && selectedFile ? "Salvar Boleto" : "Adicionar Conta")}
             </Button>
           </div>
         </form>
