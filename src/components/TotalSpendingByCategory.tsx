@@ -194,46 +194,51 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
         
         {/* Seletor de visualização */}
         <div className="space-y-2 sm:space-y-3">
-          <div className="flex gap-1 sm:gap-2 flex-nowrap overflow-x-auto whitespace-nowrap -mx-1 px-1 sm:mx-0 sm:px-0">
+          <div className="flex gap-1 sm:gap-2 flex-wrap overflow-x-hidden -mx-1 px-1 sm:mx-0 sm:px-0">
             <Button
               variant={viewType === "total" ? "default" : "outline"}
               size="sm"
-              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3 shrink-0"
+              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
               onClick={() => setViewType("total")}
             >
-              Total
+              <span className="sm:hidden">Total</span>
+              <span className="hidden sm:inline">Total</span>
             </Button>
             <Button
               variant={viewType === "mensal" ? "default" : "outline"}
               size="sm"
-              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3 shrink-0"
+              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
               onClick={() => setViewType("mensal")}
             >
-              Mensal
+              <span className="sm:hidden">Mens.</span>
+              <span className="hidden sm:inline">Mensal</span>
             </Button>
             <Button
               variant={viewType === "trimestral" ? "default" : "outline"}
               size="sm"
-              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3 shrink-0"
+              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
               onClick={() => setViewType("trimestral")}
             >
-              Trimestral
+              <span className="sm:hidden">Trim.</span>
+              <span className="hidden sm:inline">Trimestral</span>
             </Button>
             <Button
               variant={viewType === "semestral" ? "default" : "outline"}
               size="sm"
-              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3 shrink-0"
+              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
               onClick={() => setViewType("semestral")}
             >
-              Semestral
+              <span className="sm:hidden">Sem.</span>
+              <span className="hidden sm:inline">Semestral</span>
             </Button>
             <Button
               variant={viewType === "custom" ? "default" : "outline"}
               size="sm"
-              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3 shrink-0"
+              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
               onClick={() => setViewType("custom")}
             >
-              Personalizado
+              <span className="sm:hidden">Pers.</span>
+              <span className="hidden sm:inline">Personalizado</span>
             </Button>
           </div>
 
@@ -332,13 +337,13 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
                <Badge variant="secondary" className="text-xs">{basisLabel}</Badge>
              </div>
              <div className="w-full overflow-x-auto">
-               <Table className="min-w-0 sm:min-w-[520px] table-fixed w-full">
+               <Table className="min-w-0 sm:min-w-[520px] table-fixed md:table-auto w-full">
                  <TableHeader>
                    <TableRow>
                      <TableHead className="text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">Categoria</TableHead>
-                     <TableHead className="w-[100px] sm:w-[130px] text-right text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">Valor</TableHead>
-                     <TableHead className="hidden md:table-cell w-[56px] text-right text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">Qtd</TableHead>
-                     <TableHead className="hidden sm:table-cell w-[100px] md:w-[120px] text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">
+                     <TableHead className="w-[100px] sm:w-[130px] md:w-[160px] text-right text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">Valor</TableHead>
+                     <TableHead className="hidden md:table-cell md:w-[72px] text-right text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">Qtd</TableHead>
+                     <TableHead className="hidden sm:table-cell sm:w-[140px] md:w-[200px] text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">
                        <span className="hidden sm:inline">% do Total</span>
                      </TableHead>
                    </TableRow>
@@ -356,9 +361,9 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
                              <span className="w-10 text-right text-[11px] tabular-nums">{pct}%</span>
                            </div>
                          </TableCell>
-                         <TableCell className="w-[100px] sm:w-[130px] text-right whitespace-nowrap text-xs sm:text-sm py-2 sm:py-4 px-2 sm:px-4">{formatCurrency(value)}</TableCell>
-                         <TableCell className="hidden md:table-cell w-[56px] text-right text-xs sm:text-sm py-2 sm:py-4 px-2 sm:px-4">{item.count}</TableCell>
-                         <TableCell className="hidden sm:table-cell w-[100px] md:w-[120px] py-2 sm:py-4 px-2 sm:px-4">
+                         <TableCell className="w-[100px] sm:w-[130px] md:w-[160px] text-right whitespace-nowrap text-xs sm:text-sm py-2 sm:py-4 px-2 sm:px-4">{formatCurrency(value)}</TableCell>
+                         <TableCell className="hidden md:table-cell md:w-[72px] text-right text-xs sm:text-sm py-2 sm:py-4 px-2 sm:px-4">{item.count}</TableCell>
+                         <TableCell className="hidden sm:table-cell sm:w-[140px] md:w-[200px] py-2 sm:py-4 px-2 sm:px-4">
                            <div className="flex items-center gap-1 sm:gap-2">
                              <Progress value={pct} className="h-1.5 sm:h-2 w-full" />
                              <span className="w-8 sm:w-10 md:w-12 text-right text-[11px] sm:text-sm tabular-nums">{pct}%</span>
