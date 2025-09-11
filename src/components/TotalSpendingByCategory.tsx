@@ -177,28 +177,28 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
 
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader className="flex-shrink-0">
-        <CardTitle className="text-2xl font-semibold mb-4">Total Gasto por Categoria</CardTitle>
+      <CardHeader className="flex-shrink-0 pb-3 sm:pb-4">
+        <CardTitle className="text-base sm:text-2xl font-semibold mb-2 sm:mb-4">Total Gasto por Categoria</CardTitle>
         {externalRange?.startDate && externalRange?.endDate && (
-          <div className="-mt-2 mb-2">
-            <Badge variant="secondary" className="inline-flex">{externalMonthLabel}</Badge>
+          <div className="-mt-1 sm:-mt-2 mb-2">
+            <Badge variant="secondary" className="inline-flex text-xs">{externalMonthLabel}</Badge>
           </div>
         )}
 
         {/* Totais do período no cabeçalho */}
-        <div className="-mt-2 mb-2 text-sm text-muted-foreground">
+        <div className="-mt-1 sm:-mt-2 mb-2 text-xs sm:text-sm text-muted-foreground">
           Total do período: <span className="font-medium text-foreground">{formatCurrency(totalAmount)}</span>
-          <span className="px-2">•</span>
+          <span className="px-1 sm:px-2">•</span>
           Qtd: <span className="font-medium text-foreground">{totalBills}</span>
         </div>
         
         {/* Seletor de visualização */}
-        <div className="space-y-3">
-          <div className="flex gap-2 flex-wrap">
+        <div className="space-y-2 sm:space-y-3">
+          <div className="flex gap-1 sm:gap-2 flex-nowrap overflow-x-auto whitespace-nowrap -mx-1 px-1 sm:mx-0 sm:px-0">
             <Button
               variant={viewType === "total" ? "default" : "outline"}
               size="sm"
-              className="text-sm"
+              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3 shrink-0"
               onClick={() => setViewType("total")}
             >
               Total
@@ -206,7 +206,7 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
             <Button
               variant={viewType === "mensal" ? "default" : "outline"}
               size="sm"
-              className="text-sm"
+              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3 shrink-0"
               onClick={() => setViewType("mensal")}
             >
               Mensal
@@ -214,7 +214,7 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
             <Button
               variant={viewType === "trimestral" ? "default" : "outline"}
               size="sm"
-              className="text-sm"
+              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3 shrink-0"
               onClick={() => setViewType("trimestral")}
             >
               Trimestral
@@ -222,7 +222,7 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
             <Button
               variant={viewType === "semestral" ? "default" : "outline"}
               size="sm"
-              className="text-sm"
+              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3 shrink-0"
               onClick={() => setViewType("semestral")}
             >
               Semestral
@@ -230,7 +230,7 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
             <Button
               variant={viewType === "custom" ? "default" : "outline"}
               size="sm"
-              className="text-sm"
+              className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3 shrink-0"
               onClick={() => setViewType("custom")}
             >
               Personalizado
@@ -239,19 +239,20 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
 
           {/* Controles específicos por visualização */}
           {viewType === 'trimestral' && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setSelectedQuarter(q => ({ ...q, year: q.year - 1 }))}>
-                <ChevronLeft className="h-4 w-4" />
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+              <Button variant="outline" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => setSelectedQuarter(q => ({ ...q, year: q.year - 1 }))}>
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
-              <span className="text-sm font-medium w-16 text-center">{selectedQuarter.year}</span>
-              <Button variant="outline" size="icon" onClick={() => setSelectedQuarter(q => ({ ...q, year: q.year + 1 }))}>
-                <ChevronRight className="h-4 w-4" />
+              <span className="text-xs sm:text-sm font-medium w-12 sm:w-16 text-center">{selectedQuarter.year}</span>
+              <Button variant="outline" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => setSelectedQuarter(q => ({ ...q, year: q.year + 1 }))}>
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
 
-              <div className="flex gap-2">
+              <div className="flex gap-1 sm:gap-2">
                 {[1,2,3,4].map(q => (
                   <Button key={q}
                     size="sm"
+                    className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
                     variant={selectedQuarter.quarter === q ? 'default' : 'outline'}
                     onClick={() => setSelectedQuarter(prev => ({ ...prev, quarter: q as 1|2|3|4 }))}
                   >
@@ -263,19 +264,20 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
           )}
 
           {viewType === 'semestral' && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setSelectedSemester(s => ({ ...s, year: s.year - 1 }))}>
-                <ChevronLeft className="h-4 w-4" />
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+              <Button variant="outline" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => setSelectedSemester(s => ({ ...s, year: s.year - 1 }))}>
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
-              <span className="text-sm font-medium w-16 text-center">{selectedSemester.year}</span>
-              <Button variant="outline" size="icon" onClick={() => setSelectedSemester(s => ({ ...s, year: s.year + 1 }))}>
-                <ChevronRight className="h-4 w-4" />
+              <span className="text-xs sm:text-sm font-medium w-12 sm:w-16 text-center">{selectedSemester.year}</span>
+              <Button variant="outline" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => setSelectedSemester(s => ({ ...s, year: s.year + 1 }))}>
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
 
-              <div className="flex gap-2">
+              <div className="flex gap-1 sm:gap-2">
                 {[1,2].map(s => (
                   <Button key={s}
                     size="sm"
+                    className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
                     variant={selectedSemester.semester === s ? 'default' : 'outline'}
                     onClick={() => setSelectedSemester(prev => ({ ...prev, semester: s as 1|2 }))}
                   >
@@ -289,11 +291,11 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
           {/* bloco anual removido */}
 
           {viewType === 'custom' && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("w-[180px] justify-start text-left font-normal", !startDate && "text-muted-foreground")}> 
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                  <Button variant="outline" size="sm" className={cn("w-[140px] sm:w-[180px] justify-start text-left font-normal text-xs sm:text-sm h-7 sm:h-8", !startDate && "text-muted-foreground")}> 
+                    <CalendarIcon className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                     {startDate ? format(startDate, "dd/MM/yyyy") : <span>Início</span>}
                   </Button>
                 </PopoverTrigger>
@@ -304,8 +306,8 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
 
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("w-[180px] justify-start text-left font-normal", !endDate && "text-muted-foreground")}> 
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                  <Button variant="outline" size="sm" className={cn("w-[140px] sm:w-[180px] justify-start text-left font-normal text-xs sm:text-sm h-7 sm:h-8", !endDate && "text-muted-foreground")}> 
+                    <CalendarIcon className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                     {endDate ? format(endDate, "dd/MM/yyyy") : <span>Fim</span>}
                   </Button>
                 </PopoverTrigger>
@@ -315,7 +317,7 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
               </Popover>
 
               {(startDate || endDate) && (
-                <Button variant="ghost" size="sm" onClick={() => { setStartDate(undefined); setEndDate(undefined); }}>
+                <Button variant="ghost" size="sm" className="text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3" onClick={() => { setStartDate(undefined); setEndDate(undefined); }}>
                   Limpar
                 </Button>
               )}
@@ -323,47 +325,57 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
           )}
         </div>
       </CardHeader>
-      <CardContent className="flex-1 p-4 pt-0 min-h-[360px] sm:min-h-[420px]">
-        {calculatedData.length > 0 ? (
-          <div className="h-full w-full">
-            <div className="mb-3 flex items-center gap-2">
-              <Badge variant="secondary">{basisLabel}</Badge>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-right">Qtd</TableHead>
-                  <TableHead className="w-[200px]">% do Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {calculatedData.map((item) => {
-                  const value = (item as any).displayAmount as number;
-                  const pct = totalForPct ? Math.round((value / totalForPct) * 1000) / 10 : 0;
-                  return (
-                    <TableRow key={item.category}>
-                      <TableCell className="font-medium">{item.category}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(value)}</TableCell>
-                      <TableCell className="text-right">{item.count}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={pct} className="h-2" />
-                          <span className="w-12 text-right text-sm tabular-nums">{pct}%</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-            Sem dados para exibir no período selecionado.
-          </div>
-        )}
+      <CardContent className="flex-1 p-3 sm:p-4 pt-0">
+         {calculatedData.length > 0 ? (
+           <div className="h-full w-full">
+             <div className="mb-2 sm:mb-3 flex items-center gap-2">
+               <Badge variant="secondary" className="text-xs">{basisLabel}</Badge>
+             </div>
+             <div className="w-full overflow-x-auto">
+               <Table className="min-w-0 sm:min-w-[520px] table-fixed w-full">
+                 <TableHeader>
+                   <TableRow>
+                     <TableHead className="text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">Categoria</TableHead>
+                     <TableHead className="w-[100px] sm:w-[130px] text-right text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">Valor</TableHead>
+                     <TableHead className="hidden md:table-cell w-[56px] text-right text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">Qtd</TableHead>
+                     <TableHead className="hidden sm:table-cell w-[100px] md:w-[120px] text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">
+                       <span className="hidden sm:inline">% do Total</span>
+                     </TableHead>
+                   </TableRow>
+                 </TableHeader>
+                 <TableBody>
+                   {calculatedData.map((item) => {
+                     const value = (item as any).displayAmount as number;
+                     const pct = totalForPct ? Math.round((value / totalForPct) * 1000) / 10 : 0;
+                     return (
+                       <TableRow key={item.category}>
+                         <TableCell className="font-medium text-xs sm:text-sm py-2 sm:py-4 px-2 sm:px-4 leading-tight break-words max-w-[150px] sm:max-w-none">
+                           {item.category}
+                           <div className="sm:hidden mt-1 flex items-center gap-2">
+                             <Progress value={pct} className="h-1.5 w-full" />
+                             <span className="w-10 text-right text-[11px] tabular-nums">{pct}%</span>
+                           </div>
+                         </TableCell>
+                         <TableCell className="w-[100px] sm:w-[130px] text-right whitespace-nowrap text-xs sm:text-sm py-2 sm:py-4 px-2 sm:px-4">{formatCurrency(value)}</TableCell>
+                         <TableCell className="hidden md:table-cell w-[56px] text-right text-xs sm:text-sm py-2 sm:py-4 px-2 sm:px-4">{item.count}</TableCell>
+                         <TableCell className="hidden sm:table-cell w-[100px] md:w-[120px] py-2 sm:py-4 px-2 sm:px-4">
+                           <div className="flex items-center gap-1 sm:gap-2">
+                             <Progress value={pct} className="h-1.5 sm:h-2 w-full" />
+                             <span className="w-8 sm:w-10 md:w-12 text-right text-[11px] sm:text-sm tabular-nums">{pct}%</span>
+                           </div>
+                         </TableCell>
+                       </TableRow>
+                     );
+                   })}
+                 </TableBody>
+               </Table>
+             </div>
+           </div>
+         ) : (
+           <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
+             Sem dados para exibir no período selecionado.
+           </div>
+         )}
       </CardContent>
     </Card>
   );

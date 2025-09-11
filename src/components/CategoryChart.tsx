@@ -6,6 +6,7 @@ import { PieChart as PieChartIcon, BarChart3, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CategoryData {
   category: string;
@@ -31,13 +32,15 @@ const CATEGORY_COLORS = {
 
 export const CategoryChart = ({ data, basisLabel }: CategoryChartProps) => {
   const [chartType, setChartType] = useState<'pie' | 'bar' | 'line'>('pie');
+  const isMobile = useIsMobile();
   
   // Aumentar legibilidade geral
   const RADIAN = Math.PI / 180;
-  const renderCustomizedLabel = ({ cx, cy, midAngle, outerRadius, percent, category }: any) => {
+  const renderCustomizedLabel = ({ cx, cy, midAngle, outerRadius, percent, payload }: any) => {
     const radius = outerRadius + 10;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const category = payload?.category ?? payload?.name ?? '';
     return (
       <text
         x={x}
@@ -45,10 +48,27 @@ export const CategoryChart = ({ data, basisLabel }: CategoryChartProps) => {
         fill={(CATEGORY_COLORS as any)[category] || '#333'}
         textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
-        style={{ fontSize: 14, fontWeight: 600 }}
+        style={{ fontSize: isMobile ? 10 : 12, fontWeight: 600 }}
       >
         {`${category}: ${(percent * 100).toFixed(1)}%`}
       </text>
+    );
+  };
+
+  // Custom legend centralizada e adaptável (quebra em múltiplas linhas)
+  const CustomLegend = ({ payload }: any) => {
+    if (!payload) return null;
+    return (
+      <div className="w-full">
+        <div className="mx-auto flex flex-wrap justify-center items-center gap-3 px-2 py-1 text-xs sm:text-sm">
+          {payload.map((entry: any) => (
+            <div key={entry.value} className="flex items-center gap-1 whitespace-nowrap">
+              <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: entry.color }} />
+              <span>{entry.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   };
 
@@ -91,23 +111,31 @@ export const CategoryChart = ({ data, basisLabel }: CategoryChartProps) => {
     return config;
   }, {} as any);
 
+  // Altura da legenda dinâmica para acomodar múltiplas linhas
+  const legendHeight = isMobile
+    ? (data.length <= 3 ? 40 : data.length <= 6 ? 64 : 84)
+    : (data.length <= 4 ? 40 : 56);
+
+  // Choose icon based on current chart type
+  const Icon = chartType === 'bar' ? BarChart3 : chartType === 'line' ? TrendingUp : PieChartIcon;
+
   const renderChart = () => {
     switch (chartType) {
       case 'bar':
         return (
-          <BarChart data={chartData}>
-            <XAxis 
-              dataKey="category" 
-              fontSize={14}
-              angle={-45}
+          <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: isMobile ? 24 : 32 }}>
+            <XAxis
+              dataKey="category"
+              fontSize={isMobile ? 10 : 14}
+              angle={isMobile ? -30 : -45}
               textAnchor="end"
-              height={70}
+              height={isMobile ? 50 : 70}
               interval={0}
             />
-            <YAxis 
-              tickFormatter={formatCurrency} 
-              fontSize={14}
-              width={70}
+            <YAxis
+              tickFormatter={formatCurrency}
+              fontSize={isMobile ? 10 : 14}
+              width={isMobile ? 46 : 70}
             />
             <ChartTooltip content={<CustomTooltip />} />
             <Bar dataKey="amount">
@@ -115,44 +143,46 @@ export const CategoryChart = ({ data, basisLabel }: CategoryChartProps) => {
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}
             </Bar>
+            <Legend verticalAlign="bottom" align="center" height={legendHeight} content={(props) => <CustomLegend {...props} />} />
           </BarChart>
         );
       case 'line':
         return (
-          <LineChart data={chartData}>
-            <XAxis 
-              dataKey="category" 
-              fontSize={14}
-              angle={-45}
+          <LineChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: isMobile ? 24 : 32 }}>
+            <XAxis
+              dataKey="category"
+              fontSize={isMobile ? 10 : 14}
+              angle={isMobile ? -30 : -45}
               textAnchor="end"
-              height={70}
+              height={isMobile ? 50 : 70}
               interval={0}
             />
-            <YAxis 
-              tickFormatter={formatCurrency} 
-              fontSize={14}
-              width={70}
+            <YAxis
+              tickFormatter={formatCurrency}
+              fontSize={isMobile ? 10 : 14}
+              width={isMobile ? 46 : 70}
             />
             <ChartTooltip content={<CustomTooltip />} />
-            <Line 
-              type="monotone" 
-              dataKey="amount" 
-              stroke="hsl(280, 65%, 60%)" 
+            <Line
+              type="monotone"
+              dataKey="amount"
+              stroke="hsl(280, 65%, 60%)"
               strokeWidth={3}
-              dot={{ fill: "hsl(280, 65%, 60%)", strokeWidth: 2, r: 4 }}
+              dot={{ fill: "hsl(280, 65%, 60%)", strokeWidth: 2, r: isMobile ? 3 : 4 }}
             />
+            <Legend verticalAlign="bottom" align="center" height={legendHeight} content={(props) => <CustomLegend {...props} />} />
           </LineChart>
         );
       default:
         return (
-          <PieChart>
+          <PieChart margin={{ top: 10, right: 10, left: 10, bottom: Math.max(legendHeight - 24, isMobile ? 24 : 32) }}>
             <Pie
               data={chartData}
               dataKey="amount"
               nameKey="category"
               cx="50%"
               cy="50%"
-              outerRadius="75%"
+              outerRadius={isMobile ? "62%" : "72%"}
               label={renderCustomizedLabel}
               labelLine={true}
             >
@@ -161,26 +191,11 @@ export const CategoryChart = ({ data, basisLabel }: CategoryChartProps) => {
               ))}
             </Pie>
             <ChartTooltip content={<CustomTooltip />} />
-            <Legend 
-              verticalAlign="bottom" 
-              height={40}
-              formatter={(value) => value}
-              wrapperStyle={{ fontSize: '14px' }}
-            />
+            <Legend verticalAlign="bottom" align="center" height={legendHeight} content={(props) => <CustomLegend {...props} />} />
           </PieChart>
         );
     }
   };
-
-  const getIcon = () => {
-    switch (chartType) {
-      case 'bar': return BarChart3;
-      case 'line': return TrendingUp;
-      default: return PieChartIcon;
-    }
-  };
-
-  const Icon = getIcon();
 
   return (
     <Card className="h-full flex flex-col">
@@ -192,7 +207,7 @@ export const CategoryChart = ({ data, basisLabel }: CategoryChartProps) => {
           </CardTitle>
           <div className="flex items-center gap-2">
             {basisLabel && (
-              <Badge variant="secondary" className="hidden sm:inline-flex">
+              <Badge variant="secondary" className="inline-flex text-xs sm:text-sm">
                 {basisLabel}
               </Badge>
             )}
@@ -225,7 +240,7 @@ export const CategoryChart = ({ data, basisLabel }: CategoryChartProps) => {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 flex items-center p-4 pt-0 min-h-[360px] sm:min-h-[420px]">
+      <CardContent className="flex-1 flex items-center p-4 pt-0 min-h-[220px] sm:min-h-[360px] md:min-h-[420px]">
         <ChartContainer config={chartConfig} className="h-full w-full">
           <ResponsiveContainer width="100%" height="100%">
             {renderChart()}
