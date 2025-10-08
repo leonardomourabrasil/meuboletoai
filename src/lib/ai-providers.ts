@@ -1,3 +1,5 @@
+import { convertPdfToJpeg } from './pdf-converter';
+
 // Serviço unificado para diferentes provedores de IA
 export type AIProvider = 'openai' | 'gemini' | 'claude';
 
@@ -170,12 +172,35 @@ const analyzeWithOpenAI = async (file: File, base64: string, apiKey: string, isP
 const analyzeWithGemini = async (file: File, base64: string, apiKey: string, isPDF: boolean = false): Promise<BillAnalysisResult> => {
   console.log('Gemini: Enviando requisição...', isPDF ? '(PDF)' : '(Imagem)');
 
-  // Construir parts usando inline_data tanto para imagem quanto para PDF
+  // Se for PDF, tentar converter para JPEG para maximizar compatibilidade
+  let fileToSend = file;
+  let base64ToSend = base64;
+  let mimeTypeToSend = file.type;
+  let promptIsPDF = isPDF;
+
+  if (isPDF) {
+    try {
+      const conv = await convertPdfToJpeg(file);
+      if (conv.success) {
+        fileToSend = conv.convertedFile;
+        base64ToSend = await fileToBase64(fileToSend);
+        mimeTypeToSend = 'image/jpeg';
+        promptIsPDF = false; // após conversão, tratamos como imagem
+        console.log('Gemini: PDF convertido para imagem para análise.');
+      } else {
+        console.warn('Gemini: Conversão de PDF falhou, enviando PDF diretamente. Motivo:', conv.error);
+        mimeTypeToSend = 'application/pdf';
+      }
+    } catch (e) {
+      console.warn('Gemini: Erro ao converter PDF, enviando PDF diretamente.', e);
+      mimeTypeToSend = 'application/pdf';
+    }
+  }
+
+  // Construir parts usando inline_data
   const parts = [
-    { text: getAnalysisPrompt(isPDF) },
-    isPDF
-      ? { inline_data: { mime_type: 'application/pdf', data: base64 } }
-      : { inline_data: { mime_type: file.type, data: base64 } }
+    { text: getAnalysisPrompt(promptIsPDF) },
+    { inline_data: { mime_type: mimeTypeToSend, data: base64ToSend } }
   ];
 
   const payload = {
@@ -188,13 +213,19 @@ const analyzeWithGemini = async (file: File, base64: string, apiKey: string, isP
   const endpoints = [
     `${base}/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
     `${base}/v1/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`,
+    // Fallback adicional sem -latest
+    `${base}/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    // Fallback para v1beta com modelo vision compatível
     `${base}/v1beta/models/gemini-pro-vision:generateContent?key=${apiKey}`
   ];
 
   let lastError: any = null;
+  let lastEndpoint = '';
 
   for (const url of endpoints) {
     try {
+      lastEndpoint = url;
+      console.log('Gemini: tentando endpoint', url);
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -219,7 +250,7 @@ const analyzeWithGemini = async (file: File, base64: string, apiKey: string, isP
     }
   }
 
-  throw new Error(`Erro da API Gemini: ${lastError?.error?.message || (lastError instanceof Error ? lastError.message : 'Erro desconhecido')}`);
+  throw new Error(`Erro da API Gemini (${lastEndpoint || 'desconhecido'}): ${lastError?.error?.message || (lastError instanceof Error ? lastError.message : 'Erro desconhecido')}`);
 };
 
 // Implementação para Claude (Anthropic)
@@ -345,17 +376,36 @@ const DEFAULT_GEMINI_API_KEY = 'AIzaSyCwZnmmxtKyD0k2fxh1vuo8IfdAKBKQPNQ';
 // Função para obter configurações da IA do localStorage (mantida para compatibilidade)
 export const getAISettings = (): { apiKey: string | null; provider: AIProvider } => {
   try {
-    const settings = localStorage.getItem("meuboleto-settings");
-    if (settings) {
-      const parsed = JSON.parse(settings);
-      return {
-        apiKey: parsed.aiApiKey || DEFAULT_GEMINI_API_KEY,
-        provider: parsed.aiProvider || 'gemini'
-      };
+    // Tenta configurações globais e por-usuário
+    const candidates: any[] = [];
+
+    // Global
+    const rawGlobal = localStorage.getItem("meuboleto-settings");
+    if (rawGlobal) {
+      try { candidates.push(JSON.parse(rawGlobal)); } catch {}
     }
+
+    // Por-usuário (quando logado)
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) || '';
+      if (k.startsWith('meuboleto-settings-')) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          try { candidates.push(JSON.parse(raw)); } catch {}
+        }
+      }
+    }
+
+    // Escolhe a configuração com aiApiKey preenchida, senão a primeira disponível
+    const chosen = candidates.find(c => typeof c?.aiApiKey === 'string' && c.aiApiKey.trim().length > 0) || candidates[0];
+
+    return {
+      apiKey: chosen?.aiApiKey || DEFAULT_GEMINI_API_KEY,
+      provider: chosen?.aiProvider || 'gemini'
+    };
   } catch (error) {
     console.error('Erro ao obter configurações da IA:', error);
   }
-  // Para usuários novos, retorna configurações padrão com Gemini
+  // Padrão para usuários novos
   return { apiKey: DEFAULT_GEMINI_API_KEY, provider: 'gemini' };
 };
