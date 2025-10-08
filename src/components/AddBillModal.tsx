@@ -14,6 +14,7 @@ import { FileUploader } from "./FileUploader";
 import { analyzeBillWithAI, getApiKey } from "@/lib/ocr-service";
 import { useToast } from "@/hooks/use-toast";
 import { isPdfFile, convertPdfToJpeg } from "@/lib/pdf-converter";
+import { getAISettings } from "@/lib/ai-providers";
 
 interface AddBillModalProps {
   onAddBill: (bill: Omit<BillForDisplay, "id" | "status">) => void;
@@ -38,6 +39,8 @@ export const AddBillModal = ({ onAddBill, retro = false, onAddRetroBill }: AddBi
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const { toast } = useToast();
+  const { provider } = getAISettings();
+  const apiKeyPrefix = (getApiKey() || '').slice(0, 4);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,6 +305,9 @@ export const AddBillModal = ({ onAddBill, retro = false, onAddRetroBill }: AddBi
                   <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
                     <p className="text-xs sm:text-sm text-primary font-medium mb-1 break-all">
                       📄 Arquivo: {selectedFile.name}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Provedor ativo: <span className="font-medium capitalize">{provider}</span> {getApiKey() ? `(chave: ${apiKeyPrefix}…)` : `(sem chave)`}
                     </p>
                   {isAnalyzing && (
                     <div className="flex items-center gap-2 mt-2">

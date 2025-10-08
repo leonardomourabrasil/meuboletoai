@@ -20,9 +20,10 @@ export const analyzeBillWithAI = async (file: File, apiKey: string): Promise<Bil
   };
   const detected = detectProviderFromKey(key);
   if (detected && detected !== provider) {
-    console.log('OCR Service: Provider override via API key ->', detected);
+    console.log('OCR Service: Provider override via API key ->', detected, '(antes:', provider, ')');
     provider = detected;
   }
+  console.log('OCR Service: Provider ativo para análise =', provider);
   
   return await analyzeBillWithProvider(file, apiKey, provider);
 };

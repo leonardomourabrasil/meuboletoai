@@ -251,9 +251,7 @@ const analyzeWithGemini = async (file: File, base64: string, apiKey: string, isP
     `${base}/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
     `${base}/v1/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`,
     // Fallback adicional sem -latest
-    `${base}/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-    // Fallback para v1beta com modelo vision compatível
-    `${base}/v1beta/models/gemini-pro-vision:generateContent?key=${apiKey}`
+    `${base}/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`
   ];
 
   let lastError: any = null;
@@ -432,13 +430,35 @@ export const getAISettings = (): { apiKey: string | null; provider: AIProvider }
       }
     }
 
-    // Escolhe a configuração com aiApiKey preenchida, senão a primeira disponível
-    const chosen = candidates.find(c => typeof c?.aiApiKey === 'string' && c.aiApiKey.trim().length > 0) || candidates[0];
+    const isOpenAIKey = (k: string | undefined) => !!k && k.trim().startsWith('sk-');
+    const isGeminiKey = (k: string | undefined) => !!k && k.trim().startsWith('AIza');
 
-    return {
-      apiKey: (chosen?.aiApiKey && chosen.aiApiKey.trim().length > 0) ? chosen.aiApiKey : null,
-      provider: chosen?.aiProvider || 'gemini'
-    };
+    // Priorizar configurações com chaves válidas que indicam claramente o provedor
+    let chosen =
+      candidates.find(c => typeof c?.aiApiKey === 'string' && isOpenAIKey(c.aiApiKey)) ||
+      candidates.find(c => typeof c?.aiApiKey === 'string' && isGeminiKey(c.aiApiKey)) ||
+      candidates.find(c => typeof c?.aiApiKey === 'string' && c.aiApiKey.trim().length > 0) ||
+      candidates[0];
+
+    let apiKey = (chosen?.aiApiKey && chosen.aiApiKey.trim().length > 0) ? chosen.aiApiKey.trim() : null;
+    let provider: AIProvider = (chosen?.aiProvider as AIProvider) || 'gemini';
+
+    // Alinhar provider ao prefixo da chave, se aplicável
+    if (apiKey) {
+      if (isOpenAIKey(apiKey)) provider = 'openai';
+      else if (isGeminiKey(apiKey)) provider = 'gemini';
+    }
+
+    // Fallback seguro via variável de ambiente (sem salvar em localStorage)
+    if (!apiKey) {
+      const envKey = (import.meta as any).env?.VITE_DEFAULT_OPENAI_API_KEY as string | undefined;
+      if (isOpenAIKey(envKey)) {
+        apiKey = envKey!.trim();
+        provider = 'openai';
+      }
+    }
+
+    return { apiKey, provider };
   } catch (error) {
     console.error('Erro ao obter configurações da IA:', error);
   }

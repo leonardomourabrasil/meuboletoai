@@ -321,9 +321,8 @@ const Settings = () => {
                       placeholder="Cole sua chave da API"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      disabled={!settings.notificationsEnabled}
                     />
-                    <Button onClick={handleSaveSettings} disabled={!settings.notificationsEnabled}>
+                    <Button onClick={handleSaveSettings}>
                       <Key className="h-4 w-4 mr-2" />
                       Salvar
                     </Button>
