@@ -116,8 +116,42 @@ Retorne SOMENTE o objeto JSON final.`;
 const analyzeWithOpenAI = async (file: File, base64: string, apiKey: string, isPDF: boolean = false): Promise<BillAnalysisResult> => {
   console.log('OpenAI: Enviando requisição...', isPDF ? '(PDF)' : '(Imagem)');
   
-  const content = isPDF 
-    ? [
+  let content: any[];
+
+  if (isPDF) {
+    try {
+      const conv = await convertPdfToJpeg(file);
+      if (conv.success) {
+        const convertedBase64 = await fileToBase64(conv.convertedFile);
+        content = [
+          {
+            type: 'text',
+            text: getAnalysisPrompt(false)
+          },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:image/jpeg;base64,${convertedBase64}`
+            }
+          }
+        ];
+        console.log('OpenAI: PDF convertido para imagem para análise.');
+      } else {
+        console.warn('OpenAI: Conversão de PDF falhou, enviando como texto base64. Motivo:', conv.error);
+        content = [
+          {
+            type: 'text',
+            text: getAnalysisPrompt(true)
+          },
+          {
+            type: 'text', 
+            text: `Dados do PDF em base64: ${base64}`
+          }
+        ];
+      }
+    } catch (e) {
+      console.warn('OpenAI: Erro ao converter PDF, enviando como texto base64.', e);
+      content = [
         {
           type: 'text',
           text: getAnalysisPrompt(true)
@@ -126,19 +160,22 @@ const analyzeWithOpenAI = async (file: File, base64: string, apiKey: string, isP
           type: 'text', 
           text: `Dados do PDF em base64: ${base64}`
         }
-      ]
-    : [
-        {
-          type: 'text',
-          text: getAnalysisPrompt(false)
-        },
-        {
-          type: 'image_url',
-          image_url: {
-            url: `data:${file.type};base64,${base64}`
-          }
-        }
       ];
+    }
+  } else {
+    content = [
+      {
+        type: 'text',
+        text: getAnalysisPrompt(false)
+      },
+      {
+        type: 'image_url',
+        image_url: {
+          url: `data:${file.type};base64,${base64}`
+        }
+      }
+    ];
+  }
   
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -147,7 +184,7 @@ const analyzeWithOpenAI = async (file: File, base64: string, apiKey: string, isP
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: isPDF ? 'gpt-4o' : 'gpt-4o',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'user',
