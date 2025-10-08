@@ -154,6 +154,37 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
     return calculated.sort((a, b) => b.amount - a.amount);
   }, [bills, viewType, startDate, endDate, selectedQuarter, selectedSemester, externalRange, externalBasis]);
 
+  // Variação por categoria vs mês anterior (apenas na aba Mensal)
+  const previousMonthCategoryTotals = useMemo(() => {
+    if (viewType !== 'mensal') return new Map<string, number>();
+
+    // Usa o mesmo critério de intervalo e base da computação principal
+    let { start } = computeRangeFor(viewType);
+    let basis: 'paidAt' | 'dueDate' = 'dueDate';
+    if (externalRange?.startDate && externalRange?.endDate) {
+      start = externalRange.startDate;
+      basis = externalBasis ?? 'paidAt';
+    }
+
+    // Se não houver referência de início, assume mês corrente
+    const ref = start ?? new Date();
+    const startPrev = new Date(ref.getFullYear(), ref.getMonth() - 1, 1);
+    const endPrev = new Date(ref.getFullYear(), ref.getMonth(), 0);
+
+    const totals = new Map<string, number>();
+    bills.forEach(b => {
+      if (b.status !== 'paid' || !b.category) return;
+      const basisStr = basis === 'dueDate' ? b.dueDate : b.paidAt;
+      if (!basisStr) return;
+      const d = new Date(basisStr);
+      if (d >= startPrev && d <= endPrev) {
+        const amount = b.amount - (b.discount || 0);
+        totals.set(b.category!, (totals.get(b.category!) ?? 0) + amount);
+      }
+    });
+    return totals;
+  }, [bills, viewType, externalRange?.startDate, externalRange?.endDate, externalBasis]);
+
   const totalAmount = calculatedData.reduce((sum, item) => sum + (item as any).displayAmount, 0);
   const totalBills = calculatedData.reduce((sum, item) => sum + item.count, 0);
 
@@ -353,10 +384,23 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
                    {calculatedData.map((item) => {
                      const value = (item as any).displayAmount as number;
                      const pct = totalForPct ? Math.round((value / totalForPct) * 1000) / 10 : 0;
+                     // variação vs mês anterior (apenas na aba Mensal)
+                     const prevAmount = viewType === 'mensal' ? (previousMonthCategoryTotals.get(item.category) ?? 0) : undefined;
+                     const diff = prevAmount !== undefined ? (value - prevAmount) : 0;
+                     const percentRaw = prevAmount !== undefined ? (prevAmount === 0 ? (value > 0 ? 100 : 0) : ((value - prevAmount) / prevAmount) * 100) : 0;
+                     const percentChange = Math.round(percentRaw);
+                     const absDiff = Math.abs(diff);
+                     const sign = diff > 0 ? '+' : diff < 0 ? '-' : '';
+                     const trendClass = diff > 0 ? 'text-destructive' : diff < 0 ? 'text-success' : 'text-muted-foreground';
                      return (
                        <TableRow key={item.category}>
                          <TableCell className="font-medium text-xs sm:text-sm py-2 sm:py-4 px-2 sm:px-4 leading-tight break-words max-w-[150px] sm:max-w-none">
                            {item.category}
+                           {viewType === 'mensal' && (
+                             <span className={cn("ml-2 text-[10px] sm:text-xs", trendClass)}>
+                               {`${sign}${Math.abs(percentChange)}% (${formatCurrency(absDiff)})`}
+                             </span>
+                           )}
                            <div className="sm:hidden mt-1 flex items-center gap-2">
                              <Progress value={pct} className="h-1.5 w-full" />
                              <span className="w-10 text-right text-[11px] tabular-nums">{pct}%</span>
