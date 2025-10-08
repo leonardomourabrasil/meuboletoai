@@ -169,57 +169,57 @@ const analyzeWithOpenAI = async (file: File, base64: string, apiKey: string, isP
 // Implementação para Google Gemini
 const analyzeWithGemini = async (file: File, base64: string, apiKey: string, isPDF: boolean = false): Promise<BillAnalysisResult> => {
   console.log('Gemini: Enviando requisição...', isPDF ? '(PDF)' : '(Imagem)');
-  
-  const parts = isPDF 
-    ? [
-        {
-          text: getAnalysisPrompt(true)
-        },
-        {
-          text: `Dados do PDF em base64: ${base64}`
+
+  // Construir parts usando inline_data tanto para imagem quanto para PDF
+  const parts = [
+    { text: getAnalysisPrompt(isPDF) },
+    isPDF
+      ? { inline_data: { mime_type: 'application/pdf', data: base64 } }
+      : { inline_data: { mime_type: file.type, data: base64 } }
+  ];
+
+  const payload = {
+    contents: [{ role: 'user', parts }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+  };
+
+  const base = 'https://generativelanguage.googleapis.com';
+  // Tentar múltiplos endpoints/modelos para compatibilidade entre versões da API
+  const endpoints = [
+    `${base}/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+    `${base}/v1/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`,
+    `${base}/v1beta/models/gemini-pro-vision:generateContent?key=${apiKey}`
+  ];
+
+  let lastError: any = null;
+
+  for (const url of endpoints) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!content) {
+          throw new Error('Resposta vazia da API Gemini');
         }
-      ]
-    : [
-        {
-          text: getAnalysisPrompt(false)
-        },
-        {
-          inline_data: {
-            mime_type: file.type,
-            data: base64
-          }
-        }
-      ];
-  
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: parts
-      }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 1000,
+        return parseAIResponse(content);
+      } else {
+        // Guardar erro e tentar próximo endpoint
+        lastError = await response.json().catch(() => null);
+        console.warn('Gemini falhou em', url, lastError?.error?.message);
       }
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Erro da API Gemini: ${errorData.error?.message || 'Erro desconhecido'}`);
+    } catch (e) {
+      lastError = e;
+      console.warn('Gemini exceção em', url, e);
+    }
   }
 
-  const data = await response.json();
-  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  
-  if (!content) {
-    throw new Error('Resposta vazia da API Gemini');
-  }
-
-  return parseAIResponse(content);
+  throw new Error(`Erro da API Gemini: ${lastError?.error?.message || (lastError instanceof Error ? lastError.message : 'Erro desconhecido')}`);
 };
 
 // Implementação para Claude (Anthropic)
