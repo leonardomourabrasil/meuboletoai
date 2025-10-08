@@ -407,8 +407,7 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-// Chave API padrão do Gemini para novos usuários
-const DEFAULT_GEMINI_API_KEY = 'AIzaSyCwZnmmxtKyD0k2fxh1vuo8IfdAKBKQPNQ';
+
 
 // Função para obter configurações da IA do localStorage (mantida para compatibilidade)
 export const getAISettings = (): { apiKey: string | null; provider: AIProvider } => {
@@ -437,12 +436,12 @@ export const getAISettings = (): { apiKey: string | null; provider: AIProvider }
     const chosen = candidates.find(c => typeof c?.aiApiKey === 'string' && c.aiApiKey.trim().length > 0) || candidates[0];
 
     return {
-      apiKey: chosen?.aiApiKey || DEFAULT_GEMINI_API_KEY,
+      apiKey: (chosen?.aiApiKey && chosen.aiApiKey.trim().length > 0) ? chosen.aiApiKey : null,
       provider: chosen?.aiProvider || 'gemini'
     };
   } catch (error) {
     console.error('Erro ao obter configurações da IA:', error);
   }
-  // Padrão para usuários novos
-  return { apiKey: DEFAULT_GEMINI_API_KEY, provider: 'gemini' };
+  // Padrão para usuários novos: não usar chave default
+  return { apiKey: null, provider: 'gemini' };
 };
