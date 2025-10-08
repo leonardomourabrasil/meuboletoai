@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 // add table and progress imports
 import { Table, TableHeader, TableRow, TableHead, TableCell, TableBody } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export interface CategorySpending {
   category: string;
@@ -176,9 +177,12 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
   const totalForPct = useMemo(() => calculatedData.reduce((s, i) => s + (i as any).displayAmount, 0), [calculatedData]);
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="h-full flex flex-col overflow-hidden">
       <CardHeader className="flex-shrink-0 pb-3 sm:pb-4">
-        <CardTitle className="text-base sm:text-2xl font-semibold mb-2 sm:mb-4">Total Gasto por Categoria</CardTitle>
+        <div className="flex items-center gap-2 mb-2 sm:mb-4">
+          <CardTitle className="text-base sm:text-2xl font-semibold">Total Gasto por Categoria</CardTitle>
+          <Badge variant="secondary" className="text-xs">{basisLabel}</Badge>
+        </div>
         {externalRange?.startDate && externalRange?.endDate && (
           <div className="-mt-1 sm:-mt-2 mb-2">
             <Badge variant="secondary" className="inline-flex text-xs">{externalMonthLabel}</Badge>
@@ -330,15 +334,12 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
           )}
         </div>
       </CardHeader>
-      <CardContent className="flex-1 p-3 sm:p-4 pt-0">
+      <CardContent className="flex-1 min-h-0 p-3 sm:p-4 pt-0">
          {calculatedData.length > 0 ? (
-           <div className="h-full w-full">
-             <div className="mb-2 sm:mb-3 flex items-center gap-2">
-               <Badge variant="secondary" className="text-xs">{basisLabel}</Badge>
-             </div>
-             <div className="w-full overflow-x-auto">
+           <div className="h-full w-full flex flex-col">
+             <ScrollArea className="flex-1 min-h-0 w-full pr-1">
                <Table className="min-w-0 sm:min-w-[520px] table-fixed md:table-auto w-full">
-                 <TableHeader>
+                 <TableHeader className="sticky top-0 bg-background z-10">
                    <TableRow>
                      <TableHead className="text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">Categoria</TableHead>
                      <TableHead className="w-[100px] sm:w-[130px] md:w-[160px] text-right text-xs sm:text-sm h-8 sm:h-12 px-2 sm:px-4">Valor</TableHead>
@@ -374,7 +375,7 @@ export const TotalSpendingByCategory = ({ data, bills, externalRange, externalBa
                    })}
                  </TableBody>
                </Table>
-             </div>
+             </ScrollArea>
            </div>
          ) : (
            <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
